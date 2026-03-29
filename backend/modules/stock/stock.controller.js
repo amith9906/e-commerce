@@ -6,7 +6,7 @@ const getStock = async (req, res, next) => {
   try {
     const stock = await Stock.findAll({
       where: { tenantId: req.tenant.id },
-      include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'category', 'imageUrl', 'isActive'] }],
+    include: [{ model: Product, as: 'product', attributes: ['id', 'name', 'category', 'images', 'isActive'] }],
       order: [['quantity', 'ASC']], // low stock first
     });
     res.json({ success: true, data: stock });

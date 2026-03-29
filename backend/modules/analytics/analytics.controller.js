@@ -112,7 +112,7 @@ const getSalesPersonPerformance = async (req, res, next) => {
         [fn('SUM', col('total_amount')), 'totalAmount']
       ],
       where: { tenantId: req.tenant.id },
-      group: ['sales_person_id'],
+      group: ['sales_person_id', 'salesPerson.id', 'salesPerson.name', 'salesPerson.email'],
       include: [{ association: 'salesPerson', attributes: ['name', 'email'] }],
       order: [[fn('SUM', col('total_amount')), 'DESC']]
     });

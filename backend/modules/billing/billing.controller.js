@@ -39,7 +39,7 @@ const getStoreRevenue = async (req, res, next) => {
         [fn('SUM', col('amount')), 'totalRevenue']
       ],
       where: { tenantId: req.tenant.id },
-      group: ['store_id'],
+      group: ['store_id', 'store.id', 'store.name'],
       include: [{ association: 'store', attributes: ['name'] }]
     });
     res.json({ success: true, data: revenue });
