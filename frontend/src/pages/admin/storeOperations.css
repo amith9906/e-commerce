@@ -1,0 +1,320 @@
+.store-operations {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  color: var(--text-primary, #111);
+}
+
+.store-operations__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.store-operations__header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.store-operations__notice {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.store-operations__notice.success {
+  background: #e6f4ea;
+  color: #0d6c3f;
+  border: 1px solid #d0f0d8;
+}
+
+.store-operations__notice.error {
+  background: #ffe8e6;
+  color: #c20808;
+  border: 1px solid #f8b3b1;
+}
+
+.store-operations__section {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  background: #fff;
+  padding: 1.75rem;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.section-heading p {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted, #6b7280);
+}
+
+.store-operations__store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.8rem;
+}
+
+.store-card {
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: left;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.store-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.9rem;
+  color: var(--text-muted, #6b7280);
+}
+
+.store-card.active {
+  border-color: var(--primary-color, #3b82f6);
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.15);
+}
+
+.store-operations__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.9rem;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.form-grid input,
+.form-grid select,
+.form-grid textarea {
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.form-grid input:focus,
+.form-grid textarea:focus,
+.form-grid select:focus {
+  border-color: var(--primary-color, #3b82f6);
+  outline: none;
+}
+
+.form-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.store-operations__section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.store-operations__summary {
+  border: 1px dashed rgba(15, 23, 42, 0.15);
+  border-radius: 12px;
+  padding: 1rem;
+  min-height: 140px;
+}
+
+.store-operations__table-wrapper {
+  overflow-x: auto;
+}
+
+.store-operations__stock-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.store-operations__stock-table th,
+.store-operations__stock-table td {
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.store-operations__stock-table th {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted, #6b7280);
+}
+
+.store-operations__stock-table td button {
+  border: none;
+  background: none;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 1rem 0;
+  color: var(--text-muted, #6b7280);
+}
+
+.primary {
+  border: none;
+  background: var(--primary-color, #3b82f6);
+  color: #fff;
+  padding: 0.7rem 1.3rem;
+  text-align: center;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.primary:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+}
+
+.store-operations__transfers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.transfer-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+
+.transfer-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  padding: 1rem;
+  background: #f9fafb;
+}
+
+.transfer-card__product {
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.store-operations__billing {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.1rem;
+}
+
+.billing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+
+.billing-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fff;
+}
+
+.billing-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.billing-card__header .status {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary-color, #2563eb);
+}
+
+.billing-card__header .status.paid {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.billing-card__header .status.partial {
+  background: rgba(249, 115, 22, 0.15);
+  color: #c2410c;
+}
+
+.billing-card__header .status.pending {
+  background: rgba(249, 115, 22, 0.15);
+  color: #c2410c;
+}
+
+.billing-metrics ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.billing-metrics li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px dashed rgba(15, 23, 42, 0.1);
+  padding-bottom: 0.4rem;
+}
+
+.salesperson-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.salesperson-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+}
+
+@media (max-width: 900px) {
+  .store-operations__billing {
+    grid-template-columns: 1fr;
+  }
+}
