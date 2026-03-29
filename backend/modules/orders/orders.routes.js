@@ -6,7 +6,18 @@ const authenticate = require('../../middleware/authenticate');
 const requireRole = require('../../middleware/requireRole');
 const resolveTenant = require('../../middleware/resolveTenant');
 
-const { createOrder, listOrders, getOrder, updateOrderStatus, requestReturn, listReturns, updateReturnStatus, updatePaymentStatus } = require('./orders.controller');
+const {
+  createOrder,
+  listOrders,
+  getOrder,
+  getOrderInvoice,
+  downloadInvoicePdf,
+  updateOrderStatus,
+  requestReturn,
+  listReturns,
+  updateReturnStatus,
+  updatePaymentStatus
+} = require('./orders.controller');
 
 const router = express.Router();
 
@@ -31,6 +42,27 @@ router.get(
   [param('id').isUUID().withMessage('Invalid order ID')],
   validate,
   getOrder
+);
+
+router.get(
+  '/:id/invoice',
+  [param('id').isUUID().withMessage('Invalid order ID')],
+  validate,
+  getOrderInvoice
+);
+
+router.get(
+  '/:id/invoice/pdf',
+  [param('id').isUUID().withMessage('Invalid order ID')],
+  validate,
+  downloadInvoicePdf
+);
+
+router.get(
+  '/:id/invoice',
+  [param('id').isUUID().withMessage('Invalid order ID')],
+  validate,
+  getOrderInvoice
 );
 
 // Admin only

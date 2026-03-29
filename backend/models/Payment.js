@@ -16,6 +16,9 @@ const Payment = sequelize.define(
     },
     paymentMethod: { type: DataTypes.STRING, field: 'payment_method' },
     transactionRef: { type: DataTypes.STRING, field: 'transaction_ref' },
+    gatewayId: { type: DataTypes.STRING, field: 'gateway_id' },
+    refundId: { type: DataTypes.STRING, field: 'refund_id' },
+    metadata: { type: DataTypes.JSONB, defaultValue: {} },
     ...auditFields,
   },
   { ...auditOptions, tableName: 'payments' }

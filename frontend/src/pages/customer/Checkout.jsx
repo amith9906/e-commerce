@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import api from '../../api/client';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { CreditCard, CheckCircle, ShieldCheck, QrCode, ArrowRight, Loader } from 'lucide-react';
 
 export default function Checkout() {
   const { cartItems, cartTotal, clearCart } = useCart();
@@ -13,18 +14,21 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [addresses, setAddresses] = useState([]);
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState(null); // { discount, couponId }
+  const [appliedCoupon, setAppliedCoupon] = useState(null); 
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   
+  // New States for Payment Intent
+  const [paymentIntent, setPaymentIntent] = useState(null);
+  const [orderId, setOrderId] = useState(null);
+
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
   const selectedAddressId = watch('shippingAddressId');
 
   useEffect(() => {
-    if (cartItems.length === 0) {
+    if (cartItems.length === 0 && !orderId) {
       navigate('/cart', { replace: true });
     }
     
-    // Fetch user's saved addresses
     if (user) {
       api.get('/users/me')
         .then(res => {
@@ -34,7 +38,7 @@ export default function Checkout() {
         })
         .catch(err => console.error('Failed to load addresses', err));
     }
-  }, [cartItems, navigate, user]);
+  }, [cartItems, navigate, user, orderId]);
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -57,11 +61,8 @@ export default function Checkout() {
     }
   };
 
-  // Logic mirroring backend for display
   const shippingFee = cartTotal > 2000 ? 0 : 50;
   const discountAmount = appliedCoupon?.discount || 0;
-  // Note: Automatic promotions (>5k) will be applied by backend, 
-  // we could fetch them here too for better UX but for now we'll just show the coupon discount.
   const displayTotal = cartTotal - discountAmount + shippingFee;
 
   const onSubmit = async (data) => {
@@ -70,7 +71,6 @@ export default function Checkout() {
       
       let addressId = data.shippingAddressId;
 
-      // If they chose to create a new address or have none
       if (addressId === 'new' || addresses.length === 0) {
         const addressRes = await api.post('/users/addresses', {
           fullName: data.fullName,
@@ -89,7 +89,6 @@ export default function Checkout() {
         }
       }
 
-      // Format items for the API
       const orderItems = cartItems.map(item => ({
         productId: item.productId,
         quantity: item.quantity
@@ -103,22 +102,22 @@ export default function Checkout() {
       });
 
       if (orderRes.success) {
-        // Automatically mock successful payment for demo
-        const { orderId } = orderRes.data;
-        
-        // Fetch the order to get the payment ID
-        const orderDetails = await api.get(`/orders/${orderId}`);
-        const paymentId = orderDetails.data?.payment?.id;
+         const newOrderId = orderRes.data.orderId;
+         setOrderId(newOrderId);
+         
+         // Fetch order to get the payment ID
+         const orderDetails = await api.get(`/orders/${newOrderId}`);
+         const paymentId = orderDetails.data?.payment?.id;
 
-        if (paymentId) {
-          await api.post(`/payments/${paymentId}/mock-success`);
-          toast.success('Order placed and payment successful!');
-        } else {
-          toast.success('Order placed successfully!');
-        }
-        
-        clearCart();
-        navigate('/orders');
+         if (paymentId) {
+            // Get Payment Intent from the factory logic
+            const intentRes = await api.post('/payments/intent', { paymentId });
+            if (intentRes.success) {
+                setPaymentIntent({ ...intentRes.data, paymentId });
+                // If it's mock, we might want to just show the button, 
+                // but let's show the payment screen regardless for consistency.
+            }
+         }
       }
     } catch (err) {
       toast.error(err.message || 'Failed to place order. Check stock availability.');
@@ -127,7 +126,83 @@ export default function Checkout() {
     }
   };
 
+  const handleFinalizePayment = async () => {
+    try {
+        setLoading(true);
+        // This would call /confirm. In a real Stripe integration, Stripe SDK would handle this.
+        // For our multi-gateway demo, we'll call our confirm endpoint.
+        const res = await api.post(`/payments/${paymentIntent.paymentId}/confirm`, {
+            transactionRef: `TXN-${Date.now()}`,
+            gatewayResponse: { mode: paymentIntent.mode, status: 'simulated_success' }
+        });
+
+        if (res.success) {
+            toast.success('Payment Successful!');
+            clearCart();
+            navigate('/orders');
+        }
+    } catch (err) {
+        toast.error('Payment failed. Please try again.');
+    } finally {
+        setLoading(false);
+    }
+  };
+
   const showNewAddressFields = selectedAddressId === 'new' || addresses.length === 0;
+
+  // Render Payment Screen if order is placed
+  if (paymentIntent) {
+      return (
+          <div style={{ maxWidth: '600px', margin: '4rem auto', textAlign: 'center' }}>
+              <div className="card" style={{ padding: '3rem' }}>
+                  <div style={{ width: '80px', height: '80px', backgroundColor: '#eff6ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem' }}>
+                      {paymentIntent.mode === 'qr' ? <QrCode size={40} color="var(--primary-color)" /> : <CreditCard size={40} color="var(--primary-color)" />}
+                  </div>
+                  
+                  <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>Complete Payment</h1>
+                  <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Total Amount: <span style={{ color: 'var(--text-main)', fontWeight: 700 }}>${displayTotal.toFixed(2)}</span></p>
+
+                  <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '2.5rem', textAlign: 'left' }}>
+                      <p style={{ fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Instructions</p>
+                      <p style={{ fontSize: '0.925rem', lineHeight: 1.6 }}>{paymentIntent.instructions || 'Please follow the gateway instructions to complete your transaction.'}</p>
+                      
+                      {paymentIntent.mode === 'qr' && (
+                          <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '1rem', backgroundColor: 'white', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                              <div style={{ fontWeight: 800, fontSize: '1.25rem', marginBottom: '1rem' }}>Scan to Pay</div>
+                              {/* In a real app, use a QR generator component here */}
+                              <div style={{ width: '150px', height: '150px', margin: '0 auto', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                 <QrCode size={100} color="#cbd5e1" />
+                              </div>
+                              <p style={{ fontSize: '0.75rem', marginTop: '1rem', color: 'var(--text-muted)' }}>{paymentIntent.qrString}</p>
+                          </div>
+                      )}
+
+                      {paymentIntent.mode === 'stripe' && (
+                          <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'white', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                              <p style={{ fontSize: '0.875rem', fontWeight: 600 }}>Stripe Elements would render here.</p>
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Intent: {paymentIntent.clientSecret}</p>
+                          </div>
+                      )}
+                  </div>
+
+                  <button 
+                    onClick={handleFinalizePayment}
+                    disabled={loading}
+                    className="btn-primary" 
+                    style={{ width: '100%', height: '3.5rem', borderRadius: '12px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}
+                  >
+                    {loading ? <Loader className="animate-spin" size={20} /> : <><ShieldCheck size={20} /> Confirm Payment</>}
+                  </button>
+                  <button 
+                    onClick={() => navigate('/orders')}
+                    style={{ margin: '1.5rem 0 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.875rem', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Pay Later / View Order
+                  </button>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -198,12 +273,10 @@ export default function Checkout() {
           <hr style={{ border: 0, borderTop: '1px solid var(--border-color)', margin: '1rem 0' }} />
 
           <div>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>Payment</h2>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>Payment Summary</h2>
             <div style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '4px', backgroundColor: '#f8fafc' }}>
-              <p style={{ fontWeight: 500, marginBottom: '0.5rem' }}>Demo Payment System</p>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                This is a mock checkout flow. Clicking "Place Order" will automatically mark the payment as successful 
-                and confirm your order. Real credit card details are not required.
+                You will be redirected to the secure payment screen after confirming your order details.
               </p>
             </div>
           </div>
@@ -282,9 +355,9 @@ export default function Checkout() {
           form="checkout-form"
           className="btn-primary" 
           disabled={loading}
-          style={{ width: '100%', marginTop: '2rem', padding: '1rem', fontSize: '1.125rem' }}
+          style={{ width: '100%', marginTop: '2rem', padding: '1rem', fontSize: '1.125rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}
         >
-          {loading ? 'Processing...' : `Pay $${displayTotal.toFixed(2)}`}
+          {loading ? 'Processing...' : <><ArrowRight size={20} /> Continue to Payment</>}
         </button>
       </div>
 

@@ -1,8 +1,10 @@
-const { Order, OrderItem, Stock, Product, Payment, UserAddress, Notification, User, Coupon, Promotion, OrderReturn } = require('../../models');
+const { Order, OrderItem, Stock, Product, Payment, UserAddress, Notification, User, Coupon, Promotion, OrderReturn, InvoiceTemplate, OrderInvoice, PricingRule } = require('../../models');
 const { sendEmail } = require('../../utils/mailer');
 const sequelize = require('../../config/database');
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
+const { renderInvoiceContent, defaultTemplate, buildItemsList, formatCurrency, createInvoiceNumber } = require('../../utils/invoiceTemplate');
+const { createInvoicePdfBuffer } = require('../../utils/pdfGenerator');
 
 // POST /api/orders
 // Customer places an order
@@ -19,7 +21,7 @@ const createOrder = async (req, res, next) => {
 
     await sequelize.transaction(async (t) => {
       let subtotal = 0;
-      const orderItems = [];
+     const orderItems = [];
 
       for (const item of items) {
         const product = await Product.findOne({
@@ -43,13 +45,31 @@ const createOrder = async (req, res, next) => {
           updatedBy: req.user.id
         }, { transaction: t });
 
-        const unitPrice = Number(product.price);
+        const tierRule = await PricingRule.findOne({
+          where: {
+            tenantId: req.tenant.id,
+            productId: product.id,
+            isActive: true,
+            minQuantity: { [Op.lte]: item.quantity },
+            [Op.or]: [
+              { startDate: { [Op.lte]: new Date() } },
+              { startDate: null }
+            ],
+            [Op.or]: [
+              { endDate: { [Op.gte]: new Date() } },
+              { endDate: null }
+            ]
+          },
+          order: [['minQuantity', 'DESC']]
+        });
+        const unitPrice = tierRule ? Number(tierRule.price) : Number(product.price);
         subtotal += unitPrice * item.quantity;
 
         orderItems.push({
           productId: product.id,
           quantity: item.quantity,
           unitPrice,
+          product: { name: product.name },
           createdBy: req.user.id,
           updatedBy: req.user.id
         });
@@ -139,6 +159,50 @@ const createOrder = async (req, res, next) => {
         oi.orderId = order.id;
         await OrderItem.create(oi, { transaction: t });
       }
+
+      let template = await InvoiceTemplate.findOne({ where: { tenantId: req.tenant.id }, transaction: t });
+      if (!template) {
+        template = await InvoiceTemplate.create({
+          tenantId: req.tenant.id,
+          name: 'Default Invoice',
+          body: defaultTemplate,
+          createdBy: req.user.id,
+          updatedBy: req.user.id
+        }, { transaction: t });
+      }
+
+      const shippingAddress = address.toJSON();
+      const shippingLabel = [
+        shippingAddress.addressLine1,
+        shippingAddress.addressLine2,
+        shippingAddress.city,
+        shippingAddress.state,
+        shippingAddress.postalCode,
+        shippingAddress.country,
+      ].filter(Boolean).join(', ');
+
+      const itemsList = buildItemsList(orderItems);
+      const invoiceNumber = createInvoiceNumber();
+      const invoiceContent = renderInvoiceContent(template.body, {
+        invoiceNumber,
+        orderId: order.id,
+        customerName: req.user.name || req.user.email,
+        customerEmail: req.user.email,
+        orderDate: new Date(order.createdAt).toLocaleDateString(),
+        shippingAddress: shippingLabel || 'Not provided',
+        totalAmount: formatCurrency(order.totalAmount),
+        itemsList
+      });
+
+      await OrderInvoice.create({
+        tenantId: req.tenant.id,
+        orderId: order.id,
+        templateId: template.id,
+        invoiceNumber,
+        content: invoiceContent,
+        createdBy: req.user.id,
+        updatedBy: req.user.id
+      }, { transaction: t });
 
       // Create a pending payment record
       await Payment.create({
@@ -338,4 +402,71 @@ const updatePaymentStatus = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { createOrder, listOrders, getOrder, updateOrderStatus, requestReturn, listReturns, updateReturnStatus, updatePaymentStatus };
+const getOrderInvoice = async (req, res, next) => {
+  try {
+    const invoice = await OrderInvoice.findOne({
+      where: { orderId: req.params.id, tenantId: req.tenant.id },
+      include: [
+        {
+          model: Order,
+          as: 'order',
+          include: [
+            { model: User, as: 'user', attributes: ['id', 'name', 'email'] },
+            { model: OrderItem, as: 'items' }
+          ]
+        },
+        { association: 'template' }
+      ]
+    });
+    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found.' });
+
+    if (req.user.role === 'customer' && invoice.order.userId !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    res.json({ success: true, data: invoice });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const downloadInvoicePdf = async (req, res, next) => {
+  try {
+    const invoice = await OrderInvoice.findOne({
+      where: { orderId: req.params.id, tenantId: req.tenant.id },
+      include: [
+        { association: 'order', include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }] },
+        { association: 'template', attributes: ['name'] }
+      ]
+    });
+    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found.' });
+
+    if (req.user.role === 'customer' && invoice.order.userId !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Access denied.' });
+    }
+
+    const buffer = await createInvoicePdfBuffer(invoice.content, {
+      companyName: invoice.template?.name || 'Invoice',
+      generatedAt: invoice.createdAt
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoiceNumber || invoice.id}.pdf"`);
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  createOrder,
+  listOrders,
+  getOrder,
+  getOrderInvoice,
+  downloadInvoicePdf,
+  updateOrderStatus,
+  requestReturn,
+  listReturns,
+  updateReturnStatus,
+  updatePaymentStatus
+};

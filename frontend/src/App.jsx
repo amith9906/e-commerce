@@ -16,6 +16,7 @@ import OrderHistory from './pages/customer/OrderHistory';
 import Profile from './pages/customer/Profile';
 import CompareProducts from './pages/customer/CompareProducts';
 import Wishlist from './pages/customer/Wishlist';
+import ContactUs from './pages/customer/ContactUs';
 
 import Dashboard from './pages/admin/Dashboard';
 import BrandSettings from './pages/admin/BrandSettings';
@@ -27,7 +28,9 @@ import Coupons from './pages/admin/Coupons';
 import Promotions from './pages/admin/Promotions';
 import Returns from './pages/admin/Returns';
 import AdminLayout from './components/AdminLayout';
+import SalespersonDashboard from './pages/salesperson/Dashboard';
 import StoreOperations from './pages/admin/StoreOperations';
+import PaymentSettings from './pages/admin/PaymentSettings';
 
 function App() {
   return (
@@ -47,13 +50,21 @@ function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/compare" element={<CompareProducts />} />
+            <Route path="/contact" element={<ContactUs />} />
 
             {/* Customer */}
-            <Route element={<ProtectedRoute />}>
+          <Route element={<ProtectedRoute />}>
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/orders" element={<OrderHistory />} />
             </Route>
+          </Route>
+
+          <Route path="/salesperson" element={<ProtectedRoute />}>
+            <Route
+              element={<SalespersonDashboard />}
+              path=""
+            />
           </Route>
 
           {/* Admin */}
@@ -69,6 +80,7 @@ function App() {
               <Route path="promotions" element={<Promotions />} />
               <Route path="returns" element={<Returns />} />
               <Route path="store-operations" element={<StoreOperations />} />
+              <Route path="payments" element={<PaymentSettings />} />
             </Route>
           </Route>
 

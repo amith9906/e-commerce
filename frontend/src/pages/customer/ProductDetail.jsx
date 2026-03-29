@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../api/client';
 import { useCart } from '../../context/CartContext';
-import { ShoppingCart, CheckCircle, Table, Info, Truck, ShieldCheck, RefreshCw } from 'lucide-react';
+import { ShoppingCart, CheckCircle, Table, Info, Truck, ShieldCheck, RefreshCw, MapPin, Star, Heart } from 'lucide-react';
 import { toast } from 'react-toastify';
+import ReviewSection from '../../components/ReviewSection';
 
 export default function ProductDetail() {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [availability, setAvailability] = useState(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('description');
@@ -25,6 +28,18 @@ export default function ProductDetail() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!product) return;
+    setAvailabilityLoading(true);
+    api.get(`/store-stock/product/${product.id}/availability`)
+      .then((res) => {
+        if (res.success) {
+          setAvailability(res.data);
+        }
+      })
+      .finally(() => setAvailabilityLoading(false));
+  }, [product]);
 
   if (loading) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
@@ -104,6 +119,15 @@ export default function ProductDetail() {
               {product.brand || 'Premium'}
             </span>
             <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginTop: '0.5rem', lineHeight: 1.1 }}>{product.name}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem' }}>
+               <div style={{ display: 'flex' }}>
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} size={16} fill={i < Math.round(product.ratingAvg || 0) ? '#f59e0b' : 'none'} color={i < Math.round(product.ratingAvg || 0) ? '#f59e0b' : '#d1d5db'} />
+                  ))}
+               </div>
+               <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>{Number(product.ratingAvg || 0).toFixed(1)}</span>
+               <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>({product.ratingCount || 0} reviews)</span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
@@ -122,7 +146,7 @@ export default function ProductDetail() {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
                <span style={{ fontWeight: 600 }}>Quantity</span>
                <span style={{ color: inStock ? '#10b981' : '#ef4444', fontSize: '0.875rem', fontWeight: 700 }}>
-                 {inStock ? `In Stock (${product.stock.quantity})` : 'Out of Stock'}
+                 {inStock ? `In Stock (${product.stock?.quantity || 0})` : 'Out of Stock'}
                </span>
             </div>
             
@@ -157,6 +181,28 @@ export default function ProductDetail() {
                 <Heart size={24} fill={isInWishlist(product.id) ? '#ef4444' : 'none'} />
               </button>
             </div>
+            {availabilityLoading ? (
+              <p style={{ marginTop: '1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Checking store availability …</p>
+            ) : availability ? (
+              <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.9rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <MapPin size={16} color="#047857" />
+                  <span style={{ fontWeight: 600 }}>Available in {availability.stores.length} stores</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {availability.stores.slice(0, 3).map((store) => (
+                    <span key={store.id} style={{ color: '#4b5563' }}>
+                      {store.name} — {store.quantity} units {(store.contactPhone && `· ${store.contactPhone}`) || ''}
+                    </span>
+                  ))}
+                  {availability.stores.length > 3 && (
+                    <span style={{ color: '#6b7280', fontSize: '0.8rem' }}>And {availability.stores.length - 3} more store(s)</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p style={{ marginTop: '1rem', color: '#ef4444', fontWeight: 600 }}>Currently not stocked in our stores.</p>
+            )}
           </div>
 
           {/* Quick Perks */}
@@ -230,6 +276,12 @@ export default function ProductDetail() {
           )}
         </div>
       </div>
+
+      <ReviewSection 
+        productId={product.id} 
+        productRating={product.ratingAvg} 
+        productCount={product.ratingCount} 
+      />
     </div>
   );
 }

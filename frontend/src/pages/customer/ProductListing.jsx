@@ -12,6 +12,7 @@ export default function ProductListing() {
   const [comparing, setComparing] = useState([]);
   const [meta, setMeta] = useState({ categories: [], brands: [], colors: [], sizes: [] });
   const [filters, setFilters] = useState({ category: '', brand: '', color: '', size: '', sort: 'newest', q: '' });
+  const [availabilityMap, setAvailabilityMap] = useState({});
   const { addToCart, addToWishlist, removeFromWishlist, isInWishlist } = useCart();
 
   useEffect(() => {
@@ -55,6 +56,33 @@ export default function ProductListing() {
 
     fetchProducts();
   }, [filters]);
+
+  useEffect(() => {
+    if (!products.length) {
+      setAvailabilityMap({});
+      return;
+    }
+    const ids = products.slice(0, 24).map((p) => p.id).join(',');
+    if (!ids) {
+      setAvailabilityMap({});
+      return;
+    }
+    const fetchAvailability = async () => {
+      try {
+        const res = await api.get('/store-stock/products/availability', { params: { productIds: ids } });
+        if (res.success) {
+          const map = {};
+          res.data.forEach((item) => {
+            map[item.productId] = item;
+          });
+          setAvailabilityMap(map);
+        }
+      } catch (err) {
+        console.error('Unable to load availability', err);
+      }
+    };
+    fetchAvailability();
+  }, [products]);
 
   const handleWishlistToggle = (e, product) => {
     e.preventDefault();
@@ -227,6 +255,17 @@ export default function ProductListing() {
                         )}
                         {product.stock?.quantity <= 1 && (
                             <div style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: 700 }}>OUT OF STOCK</div>
+                        )}
+                        {!availabilityMap[product.id] && (
+                          <div style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '0.25rem' }}>Checking store availability…</div>
+                        )}
+                        {availabilityMap[product.id] && availabilityMap[product.id].totalQuantity > 0 && (
+                          <div style={{ fontSize: '0.7rem', color: '#047857', marginTop: '0.25rem' }}>
+                            {availabilityMap[product.id].totalQuantity} units across {availabilityMap[product.id].stores.length} stores
+                          </div>
+                        )}
+                        {availabilityMap[product.id] && availabilityMap[product.id].totalQuantity === 0 && (
+                          <div style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.25rem' }}>Currently unavailable at stores</div>
                         )}
                     </div>
                     

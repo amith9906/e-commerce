@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../api/client';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { Shield, ShieldAlert, User as UserIcon, ShoppingBag, ChevronDown, ChevronUp, MapPin, Phone, Mail, Calendar } from 'lucide-react';
+
+dayjs.extend(relativeTime);
 
 export default function Users() {
   const navigate = useNavigate();

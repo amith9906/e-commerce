@@ -5,7 +5,7 @@ const validate = require('../../middleware/validate');
 const authenticate = require('../../middleware/authenticate');
 const resolveTenant = require('../../middleware/resolveTenant');
 
-const { getPayments, mockPaymentSuccess } = require('./payments.controller');
+const { getPayments, createPaymentIntent, confirmPaymentResult, processRefund } = require('./payments.controller');
 
 const router = express.Router();
 
@@ -13,11 +13,20 @@ router.use(resolveTenant, authenticate);
 
 router.get('/', getPayments);
 
+router.post('/intent', createPaymentIntent);
+
 router.post(
-  '/:id/mock-success',
+  '/:id/confirm',
   [param('id').isUUID().withMessage('Invalid Payment ID')],
   validate,
-  mockPaymentSuccess
+  confirmPaymentResult
+);
+
+router.post(
+  '/:id/refund',
+  [param('id').isUUID().withMessage('Invalid Payment ID')],
+  validate,
+  processRefund
 );
 
 module.exports = router;

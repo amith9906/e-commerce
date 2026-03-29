@@ -25,6 +25,14 @@ const storesRoutes = require('./modules/stores/stores.routes');
 const storeStockRoutes = require('./modules/storeStock/storeStock.routes');
 const transfersRoutes = require('./modules/transfers/transfers.routes');
 const billingRoutes = require('./modules/billing/billing.routes');
+const salespersonsRoutes = require('./modules/salespersons/salespersons.routes');
+const alertsRoutes = require('./modules/alerts/alerts.routes');
+const invoicesRoutes = require('./modules/invoices/invoices.routes');
+const commissionsRoutes = require('./modules/commissions/commissions.routes');
+const pickupsRoutes = require('./modules/pickups/pickups.routes');
+const pricingRoutes = require('./modules/pricing/pricing.routes');
+const reviewsRoutes = require('./modules/products/reviews.routes');
+const supportRoutes = require('./modules/support/support.routes');
 
 const app = express();
 
@@ -75,6 +83,14 @@ app.use('/api/stores', storesRoutes);
 app.use('/api/store-stock', storeStockRoutes);
 app.use('/api/transfers', transfersRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/salespersons', salespersonsRoutes);
+app.use('/api/alerts', alertsRoutes);
+app.use('/api/invoice-template', invoicesRoutes);
+app.use('/api/commissions', commissionsRoutes);
+app.use('/api/pickups', pickupsRoutes);
+app.use('/api/pricing', pricingRoutes);
+app.use('/api/reviews', reviewsRoutes);
+app.use('/api/support', supportRoutes);
 
 // Error Handling
 app.use((req, res, next) => {

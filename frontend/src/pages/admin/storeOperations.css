@@ -109,6 +109,17 @@
   font-size: 0.9rem;
 }
 
+.store-operations__template {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.store-operations__template textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+
 .form-grid input,
 .form-grid select,
 .form-grid textarea {
@@ -246,6 +257,104 @@
   background: #fff;
 }
 
+.billing-card__download {
+  margin-top: 0.75rem;
+  border: none;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--primary-color, #2563eb);
+  border-radius: 8px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.billing-card__download:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.store-operations__alerts {
+  background: #f9fafb;
+}
+
+.alerts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.alert-card {
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.alert-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.alert-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.alert-card li strong {
+  display: block;
+  font-weight: 600;
+}
+
+.alert-card--export {
+  justify-content: center;
+  text-align: center;
+}
+
+.alert-card--export p {
+  color: #475569;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.commissions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.store-operations__commissions input {
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  padding: 0.5rem;
+}
+
+.store-operations__pricing .pricing-list {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pricing-item {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
 .billing-card__header {
   display: flex;
   justify-content: space-between;
@@ -317,4 +426,38 @@
   .store-operations__billing {
     grid-template-columns: 1fr;
   }
+}
+.pickup-table {
+  margin-top: 1rem;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.pickup-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 0.8fr 1fr 1fr 1fr;
+  padding: 0.85rem 1rem;
+  align-items: center;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.pickup-row--header {
+  background: #f8fafc;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pickup-row:last-child {
+  border-bottom: none;
+}
+
+.pickup-row button.ghost {
+  border: 1px solid rgba(15, 23, 42, 0.3);
+  background: none;
+  border-radius: 8px;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
 }

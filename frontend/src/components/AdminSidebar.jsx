@@ -9,7 +9,8 @@ import {
   Ticket, 
   Percent,
   RotateCcw,
-  MapPin
+  MapPin,
+  CreditCard
 } from 'lucide-react';
 
 export default function AdminSidebar() {
@@ -25,6 +26,7 @@ export default function AdminSidebar() {
     { name: 'Promotions', path: '/admin/promotions', icon: Percent },
     { name: 'Returns', path: '/admin/returns', icon: RotateCcw },
     { name: 'Branding', path: '/admin/brand', icon: Palette },
+    { name: 'Payment Settings', path: '/admin/payments', icon: CreditCard },
     { name: 'Store Operations', path: '/admin/store-operations', icon: MapPin },
   ];
 

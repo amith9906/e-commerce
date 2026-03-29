@@ -20,6 +20,8 @@ const Product = sequelize.define(
     specifications: { type: DataTypes.JSONB, defaultValue: {} },
     highlights: { type: DataTypes.ARRAY(DataTypes.TEXT), defaultValue: [] },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
+    ratingAvg: { type: DataTypes.DECIMAL(3, 2), defaultValue: 0, field: 'rating_avg' },
+    ratingCount: { type: DataTypes.INTEGER, defaultValue: 0, field: 'rating_count' },
     ...auditFields,
   },
   { ...auditOptions, tableName: 'products' }

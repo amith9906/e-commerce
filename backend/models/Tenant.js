@@ -11,6 +11,7 @@ const Tenant = sequelize.define(
     slug: { type: DataTypes.STRING, allowNull: false, unique: true },
     plan: { type: DataTypes.STRING, defaultValue: 'free' },
     status: { type: DataTypes.ENUM('active', 'suspended', 'deleted'), defaultValue: 'active' },
+    settings: { type: DataTypes.JSONB, defaultValue: {} },
     ...auditFields,
   },
   { ...auditOptions, tableName: 'tenants' }

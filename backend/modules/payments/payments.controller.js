@@ -1,5 +1,6 @@
 'use strict';
-const { Payment, Order } = require('../../models');
+const { Payment, Order, Tenant } = require('../../models');
+const PaymentGatewayFactory = require('./paymentGateway.factory');
 
 // GET /api/payments
 const getPayments = async (req, res, next) => {
@@ -8,10 +9,6 @@ const getPayments = async (req, res, next) => {
     const offset = (page - 1) * limit;
 
     const where = { tenantId: req.tenant.id };
-    if (req.user.role === 'customer') {
-      // Find orders for user, then payments for those orders
-      // For simplicity, just joining with Order
-    }
     if (status) where.status = status;
 
     const includeOrder = req.user.role === 'customer' 
@@ -30,25 +27,66 @@ const getPayments = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// POST /api/payments/:id/mock-success
-// Mock endpoint to simulate payment gateway webhook success
-const mockPaymentSuccess = async (req, res, next) => {
+/**
+ * Initialize a payment intent/session with the tenant's chosen gateway
+ */
+const createPaymentIntent = async (req, res, next) => {
   try {
-    const payment = await Payment.findOne({ where: { id: req.params.id, tenantId: req.tenant.id } });
+    const { paymentId } = req.body;
+    const payment = await Payment.findOne({ where: { id: paymentId, tenantId: req.tenant.id, status: 'pending' } });
+    if (!payment) return res.status(404).json({ success: false, message: 'Pending payment record not found.' });
+
+    const tenant = await Tenant.findByPk(req.tenant.id);
+    const driver = PaymentGatewayFactory.getDriver(tenant.settings || {});
+    
+    const intent = await driver.createIntent(payment, tenant.settings || {});
+    res.json({ success: true, data: intent });
+  } catch (err) { next(err); }
+};
+
+/**
+ * Mark payment as success (Webhooks would normally handle this, but keeping it for manual/mock overrides)
+ */
+const confirmPaymentResult = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { transactionRef, gatewayResponse } = req.body;
+    
+    const payment = await Payment.findOne({ where: { id, tenantId: req.tenant.id } });
     if (!payment) return res.status(404).json({ success: false, message: 'Payment not found.' });
 
     await payment.update({ 
       status: 'success', 
-      transactionRef: `MOCK-${Date.now()}`,
+      transactionRef: transactionRef || `REF-${Date.now()}`,
+      metadata: { ...payment.metadata, gatewayResponse },
       updatedBy: req.user.id 
     });
 
-    // Update order status
-    const order = await Order.findByPk(payment.orderId);
-    if (order) await order.update({ status: 'confirmed', updatedBy: req.user.id });
-
-    res.json({ success: true, data: payment, message: 'Payment marked as success. Order confirmed.' });
+    await Order.update({ status: 'confirmed' }, { where: { id: payment.orderId } });
+    res.json({ success: true, message: 'Payment confirmed and order updated.' });
   } catch (err) { next(err); }
 };
 
-module.exports = { getPayments, mockPaymentSuccess };
+/**
+ * Process a refund for an existing payment
+ */
+const processRefund = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const payment = await Payment.findOne({ where: { id, tenantId: req.tenant.id, status: 'success' } });
+    if (!payment) return res.status(404).json({ success: false, message: 'Successful payment not found for refund.' });
+
+    const tenant = await Tenant.findByPk(req.tenant.id);
+    const driver = PaymentGatewayFactory.getDriver(tenant.settings || {});
+    
+    const refundResult = await driver.processRefund(payment, tenant.settings || {});
+    if (refundResult.success) {
+      await payment.update({ status: 'refunded', refundId: refundResult.refundId });
+      res.json({ success: true, message: 'Refund processed successfully.', data: refundResult });
+    } else {
+      res.status(400).json({ success: false, message: refundResult.message || 'Gateway refund failed.' });
+    }
+  } catch (err) { next(err); }
+};
+
+module.exports = { getPayments, createPaymentIntent, confirmPaymentResult, processRefund };
