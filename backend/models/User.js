@@ -18,6 +18,11 @@ const User = sequelize.define(
     isVerified: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_verified' },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
     phone: { type: DataTypes.STRING, allowNull: true },
+    age: { type: DataTypes.INTEGER, allowNull: true },
+    gender: {
+      type: DataTypes.ENUM('male', 'female', 'other'),
+      allowNull: true,
+    },
     employeeCode: { type: DataTypes.STRING, allowNull: true, field: 'employee_code' },
     ...auditFields,
   },

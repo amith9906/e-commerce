@@ -12,7 +12,9 @@ const {
   getTopSellingProducts,
   getStoreRevenueStats,
   getSalesPersonPerformance,
-  getStoreOrderBreakdown
+  getStoreOrderBreakdown,
+  getInventoryAlerts,
+  exportCommissionCsv
 } = require('./analytics.controller');
 const { refreshSummaries } = require('./summaries.controller');
 
@@ -28,6 +30,8 @@ router.get('/stats', getBasicStats);
 router.get('/stores/revenue', getStoreRevenueStats);
 router.get('/salespersons/performance', getSalesPersonPerformance);
 router.get('/stores/breakdown', getStoreOrderBreakdown);
+router.get('/inventory/alerts', getInventoryAlerts);
+router.get('/commissions/export', exportCommissionCsv);
 router.post('/summaries/refresh', refreshSummaries);
 
 module.exports = router;

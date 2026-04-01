@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-toastify';
 import api from '../../api/client';
 import './storeOperations.css';
+import { formatCurrency as formatCurrencyValue } from '../../utils/formatCurrency';
 
-const formatCurrency = (value) => {
-  const amount = Number(value);
-  return Number.isNaN(amount)
-    ? '-'
-    : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(amount);
-};
+const formatMoney = (value, formatted, currency) => formatted || formatCurrencyValue(value, currency);
 
 const StoreOperations = () => {
   const [stores, setStores] = useState([]);
@@ -17,6 +14,7 @@ const StoreOperations = () => {
   const [billingRecords, setBillingRecords] = useState([]);
   const [storeRevenue, setStoreRevenue] = useState([]);
   const [salespersonPerformance, setSalespersonPerformance] = useState([]);
+  const [salespersonError, setSalespersonError] = useState('');
   const [recentTransfers, setRecentTransfers] = useState([]);
   const [storeForm, setStoreForm] = useState({ name: '', contactName: '', contactPhone: '', address: '' });
   const [stockForm, setStockForm] = useState({ productId: '', quantity: 0, lowStockThreshold: 5 });
@@ -25,8 +23,14 @@ const StoreOperations = () => {
   const [error, setError] = useState('');
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
   const [alerts, setAlerts] = useState({ lowStock: [], invoices: [], deliveryProof: [] });
+  const [backInStockAlerts, setBackInStockAlerts] = useState([]);
+  const [backInStockLoading, setBackInStockLoading] = useState(true);
+  const [backInStockError, setBackInStockError] = useState('');
+  const [backInStockActionLoading, setBackInStockActionLoading] = useState('');
   const [invoiceTemplate, setInvoiceTemplate] = useState({ name: '', body: '' });
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [previewState, setPreviewState] = useState({ loading: false, content: '', metadata: null, error: '' });
+  const [previewPdfLoading, setPreviewPdfLoading] = useState(false);
   const [commissionRange, setCommissionRange] = useState({ startDate: '', endDate: '' });
   const [pricingRules, setPricingRules] = useState([]);
   const [pricingForm, setPricingForm] = useState({
@@ -86,6 +90,7 @@ const StoreOperations = () => {
       fetchSalespersonPerformance(),
       fetchTransfers(),
       fetchAlerts(),
+      fetchBackInStockAlerts(),
       fetchPickupRequests()
     ]);
   };
@@ -216,6 +221,26 @@ const StoreOperations = () => {
     }
   };
 
+  const fetchBackInStockAlerts = async () => {
+    setBackInStockLoading(true);
+    try {
+      const res = await api.get('/stock/alerts');
+      if (res.success) {
+        setBackInStockAlerts(res.data || []);
+        setBackInStockError('');
+      } else {
+        setBackInStockAlerts([]);
+      }
+    } catch (err) {
+      console.error('Unable to load back-in-stock alerts', err);
+      setBackInStockError('Unable to load restock requests right now.');
+      setBackInStockAlerts([]);
+      toast.error('Unable to load back-in-stock alerts at the moment.');
+    } finally {
+      setBackInStockLoading(false);
+    }
+  };
+
   const fetchInvoiceTemplate = async () => {
     try {
       const res = await api.get('/invoice-template/template');
@@ -243,6 +268,36 @@ const StoreOperations = () => {
       setError(err?.message || 'Unable to save template.');
     } finally {
       setIsSavingTemplate(false);
+    }
+  };
+
+  const handlePreviewTemplate = async () => {
+    setPreviewState((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      const res = await api.post('/invoice-template/preview', { body: invoiceTemplate.body });
+      setPreviewState({ loading: false, content: res.data.content, metadata: res.data.metadata, error: '' });
+    } catch (err) {
+      setPreviewState({ loading: false, content: '', metadata: null, error: err?.message || 'Unable to render preview.' });
+    }
+  };
+
+  const handleDownloadPreviewPdf = async () => {
+    setPreviewPdfLoading(true);
+    try {
+      const blob = await api.post('/invoice-template/preview/pdf', { body: invoiceTemplate.body }, { responseType: 'blob' });
+      const fileBlob = blob instanceof Blob ? blob : new Blob([blob], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(fileBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'invoice-preview.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.message || 'Unable to download preview PDF.');
+    } finally {
+      setPreviewPdfLoading(false);
     }
   };
 
@@ -286,6 +341,20 @@ const StoreOperations = () => {
     }
   };
 
+  const cancelBackInStockAlert = async (alertId) => {
+    setBackInStockActionLoading(alertId);
+    setBackInStockError('');
+    try {
+      await api.delete(`/stock/alerts/${alertId}`);
+      await fetchBackInStockAlerts();
+      setStatus('Restock alert cancelled.');
+    } catch (err) {
+      setBackInStockError(err?.message || 'Unable to cancel the alert.');
+    } finally {
+      setBackInStockActionLoading('');
+    }
+  };
+
   const fetchStoreRevenue = async () => {
     try {
       const res = await api.get('/billing/store-revenue');
@@ -301,10 +370,13 @@ const StoreOperations = () => {
     try {
       const res = await api.get('/analytics/salespersons/performance');
       if (res.success) {
+        setSalespersonError('');
         setSalespersonPerformance(res.data || []);
       }
     } catch (err) {
       console.error('Unable to load salesperson stats', err);
+      setSalespersonError('Unable to load salesperson performance right now.');
+      toast.error('Unable to load salesperson performance data.');
     }
   };
 
@@ -498,6 +570,56 @@ const StoreOperations = () => {
         </div>
       </section>
 
+      <section className="store-operations__section store-operations__back-in-stock">
+        <div className="section-heading">
+          <h2>Back-in-Stock Alerts</h2>
+          <p>See which customers are waiting for specific SKUs and cancel stale requests.</p>
+        </div>
+        {backInStockLoading ? (
+          <div className="back-in-stock-loading">Loading restock watchlist…</div>
+        ) : backInStockAlerts.length === 0 ? (
+          <div className="back-in-stock-empty">No back-in-stock alerts have been registered.</div>
+        ) : (
+          <div className="back-in-stock-grid">
+            {backInStockAlerts.slice(0, 6).map((alert) => {
+              const isPending = alert.status === 'pending';
+              const actionLabel = isPending
+                ? backInStockActionLoading === alert.id ? 'Cancelling…' : 'Cancel request'
+                : 'Request closed';
+              return (
+                <article key={alert.id} className="back-in-stock-card">
+                  <div className="back-in-stock-card__header">
+                    <div>
+                      <strong>{alert.product?.name || 'Product'}</strong>
+                      <span className="back-in-stock-card__meta">
+                        Requested {alert.createdAt ? new Date(alert.createdAt).toLocaleString() : 'recently'}
+                      </span>
+                    </div>
+                    <span className={`badge badge--${alert.status}`}>{alert.status}</span>
+                  </div>
+                  <p style={{ margin: '0.25rem 0' }}>
+                    <strong>{alert.email}</strong>
+                    {alert.user?.name && <span className="back-in-stock-card__meta">User: {alert.user.name}</span>}
+                  </p>
+                  {alert.note && <p className="back-in-stock-card__note">{alert.note}</p>}
+                  <div className="back-in-stock-card__actions">
+                    <button
+                      type="button"
+                      className="ghost"
+                      disabled={!isPending || backInStockActionLoading === alert.id}
+                      onClick={() => cancelBackInStockAlert(alert.id)}
+                    >
+                      {actionLabel}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+        {backInStockError && <p className="store-operations__notice error">{backInStockError}</p>}
+      </section>
+
       <section className="store-operations__section store-operations__commissions">
         <div className="section-heading">
           <h2>Commission Reports</h2>
@@ -604,18 +726,46 @@ const StoreOperations = () => {
           </label>
           <label className="full-width">
             Template Body
-            <textarea
-              rows="6"
-              value={invoiceTemplate.body}
-              onChange={(event) => handleTemplateChange('body', event.target.value)}
-              placeholder="Use placeholders like {{invoiceNumber}}, {{orderId}}, {{customerName}}, {{totalAmount}}, {{itemsList}}"
-            />
-          </label>
-          <button type="button" className="primary" onClick={handleTemplateSave} disabled={isSavingTemplate}>
-            {isSavingTemplate ? 'Saving template…' : 'Save Template'}
+          <textarea
+            rows="6"
+            value={invoiceTemplate.body}
+            onChange={(event) => handleTemplateChange('body', event.target.value)}
+            placeholder="Use placeholders like {{invoiceNumber}}, {{orderId}}, {{customerName}}, {{totalAmount}}, {{itemsList}}"
+          />
+        </label>
+        <div className="store-operations__template-actions">
+          <button type="button" className="primary" onClick={handlePreviewTemplate} disabled={previewState.loading}>
+            {previewState.loading ? 'Generating preview…' : 'Preview Invoice'}
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={handleDownloadPreviewPdf}
+            disabled={!previewState.content || previewPdfLoading}
+          >
+            {previewPdfLoading ? 'Preparing PDF…' : 'Download Preview PDF'}
           </button>
         </div>
-      </section>
+        <button type="button" className="primary" onClick={handleTemplateSave} disabled={isSavingTemplate}>
+          {isSavingTemplate ? 'Saving template…' : 'Save Template'}
+        </button>
+        {previewState.error && <p className="store-operations__template-error">{previewState.error}</p>}
+        {previewState.content && (
+          <div className="store-operations__preview">
+            <div className="store-operations__preview-meta">
+              <span>Invoice: {previewState.metadata?.invoiceNumber}</span>
+              <span>Order: {previewState.metadata?.orderId}</span>
+              <span>Total: {previewState.metadata?.totalAmount || previewState.metadata?.formattedTotals?.total}</span>
+            </div>
+            <pre>{previewState.content}</pre>
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: '#475569' }}>
+              <span>Customer: {previewState.metadata?.customerName}</span>
+              <span>Currency: {previewState.metadata?.currency}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
 
       <section className="store-operations__section store-operations__pricing">
         <div className="section-heading">
@@ -931,7 +1081,7 @@ const StoreOperations = () => {
                   {item.sourceStore?.name || 'Central'} → {item.destinationStore?.name || 'Store'}
                 </p>
                 <small>
-                  {item.quantity} units · {item.status} · {formatCurrency(item.totalAmount)}
+                  {item.quantity} units · {item.status} · {formatCurrencyValue(item.totalAmount, item.currency || 'INR')}
                 </small>
               </article>
             ))}
@@ -954,7 +1104,12 @@ const StoreOperations = () => {
                   <span className={`status ${record.paymentStatus}`}>{record.paymentStatus}</span>
                 </div>
                 <p>Store: {record.store?.name || 'Unknown'}</p>
-                <p>Amount: {formatCurrency(record.amount)}</p>
+                <p>
+                  Amount: {formatMoney(record.amount, record.formattedAmount, record.currency)}
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                    {record.currency || 'INR'}
+                  </span>
+                </p>
                 <small>Due: {record.dueDate ? new Date(record.dueDate).toLocaleDateString() : 'Immediate'}</small>
                 <button className="billing-card__download" type="button" onClick={() => downloadInvoice(record)}>
                   Download Invoice
@@ -972,7 +1127,9 @@ const StoreOperations = () => {
                     <strong>{row.store?.name || 'Unknown store'}</strong>
                     <p>{row.invoiceCount} invoices</p>
                   </div>
-                  <span>{formatCurrency(row.totalRevenue)}</span>
+                  <span>
+                    {formatMoney(row.totalRevenue, row.formattedRevenue, row.currency)}
+                  </span>
                 </li>
               ))}
               {!storeRevenue.length && <li>No revenue data yet.</li>}
@@ -986,6 +1143,11 @@ const StoreOperations = () => {
           <h2>Salesperson Analytics</h2>
           <p>Track which sales team members are moving stock and generating revenue.</p>
         </div>
+        {salespersonError && (
+          <p className="store-operations__notice error" style={{ marginTop: '-0.75rem' }}>
+            {salespersonError}
+          </p>
+        )}
         <ul className="salesperson-list">
           {salespersonPerformance.map((entry) => (
             <li key={entry.sales_person_id}>
@@ -994,7 +1156,7 @@ const StoreOperations = () => {
                 <p>{entry.salesPerson?.email || 'No email available'}</p>
               </div>
               <span>
-                {entry.totalUnits} units · {formatCurrency(entry.totalAmount)}
+                {entry.totalUnits} units · {formatMoney(entry.totalAmount, entry.formattedTotalAmount, entry.currency)}
               </span>
             </li>
           ))}

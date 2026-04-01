@@ -4,6 +4,7 @@ const { body, param } = require('express-validator');
 const validate = require('../../middleware/validate');
 const authenticate = require('../../middleware/authenticate');
 const resolveTenant = require('../../middleware/resolveTenant');
+const upload = require('../../middleware/upload');
 const { getProductReviews, submitReview } = require('./reviews.controller');
 
 const router = express.Router();
@@ -18,6 +19,7 @@ router.get('/:productId',
 
 router.post('/',
   authenticate,
+  upload.array('images', 4),
   [
     body('productId').isUUID(),
     body('rating').isInt({ min: 1, max: 5 }),

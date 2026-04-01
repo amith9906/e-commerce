@@ -15,6 +15,11 @@ const Promotion = sequelize.define(
     discountType: { type: DataTypes.ENUM('percentage', 'fixed'), allowNull: false, field: 'discount_type' },
     discountValue: { type: DataTypes.DECIMAL(10, 2), allowNull: false, field: 'discount_value' },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
+    bannerImage: { type: DataTypes.STRING, allowNull: true, field: 'banner_image' },
+    ctaText: { type: DataTypes.STRING, allowNull: true, field: 'cta_text' },
+    ctaUrl: { type: DataTypes.STRING, allowNull: true, field: 'cta_url' },
+    validFrom: { type: DataTypes.DATE, allowNull: true, field: 'valid_from' },
+    validTo: { type: DataTypes.DATE, allowNull: true, field: 'valid_to' },
     ...auditFields,
   },
   { ...auditOptions, tableName: 'promotions' }

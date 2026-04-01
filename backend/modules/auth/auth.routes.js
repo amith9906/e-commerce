@@ -2,7 +2,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const validate = require('../../middleware/validate');
-const { register, verifyOtp, resendOtp, login } = require('./auth.controller');
+const { register, verifyOtp, resendOtp, login, forgotPassword, resetPassword } = require('./auth.controller');
 const resolveTenant = require('../../middleware/resolveTenant');
 
 const router = express.Router();
@@ -35,6 +35,26 @@ router.post(
   [body('email').isEmail(), body('password').notEmpty()],
   validate,
   login
+);
+
+router.post(
+  '/forgot-password',
+  resolveTenant,
+  [body('email').isEmail()],
+  validate,
+  forgotPassword
+);
+
+router.post(
+  '/reset-password',
+  resolveTenant,
+  [
+    body('email').isEmail(),
+    body('otp').isLength({ min: 6, max: 6 }),
+    body('newPassword').isLength({ min: 6 }),
+  ],
+  validate,
+  resetPassword
 );
 
 module.exports = router;

@@ -6,13 +6,15 @@ const authenticate = require('../../middleware/authenticate');
 const requireRole = require('../../middleware/requireRole');
 const resolveTenant = require('../../middleware/resolveTenant');
 
-const { getNotifications, markAsRead, broadcast } = require('./notifications.controller');
+const { getNotifications, markAsRead, broadcast, streamNotifications } = require('./notifications.controller');
 
 const router = express.Router();
 
 router.use(resolveTenant, authenticate);
 
 router.get('/', getNotifications);
+
+router.get('/stream', streamNotifications);
 
 router.patch(
   '/:id/read',

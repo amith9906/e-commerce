@@ -1,26 +1,42 @@
 'use strict';
+const bcrypt = require('bcryptjs');
+const { Op } = require('sequelize');
 const { User, UserAddress, ProductView, Product } = require('../../models');
+const { parsePaginationParams, buildPaginationMeta } = require('../../utils/pagination');
 
 // GET /api/users
 // Admin: list users in their tenant
 const listUsers = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const pagination = parsePaginationParams(req.query);
+    const { page, limit, offset } = pagination;
+    const { q, role, status } = req.query;
+    const where = { tenantId: req.tenant.id };
+    if (role) where.role = role;
+    if (status === 'verified') where.isVerified = true;
+    else if (status === 'unverified') where.isVerified = false;
+    if (q) {
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${q}%` } },
+        { email: { [Op.iLike]: `%${q}%` } }
+      ];
+    }
 
     const { count, rows } = await User.findAndCountAll({
-      where: { tenantId: req.tenant.id },
+      where,
       attributes: { exclude: ['passwordHash'] },
       include: [{ model: UserAddress, as: 'addresses', limit: 1 }],
       order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
+      limit,
+      offset,
     });
+
+    const paginationMeta = buildPaginationMeta(count, { page, limit });
 
     res.json({ 
       success: true, 
       data: rows,
-      pagination: { total: count, page: parseInt(page), pages: Math.ceil(count / limit) }
+      pagination: paginationMeta
     });
   } catch (err) { next(err); }
 };
@@ -44,14 +60,67 @@ const getProfile = async (req, res, next) => {
 // Customer/Admin: update own profile
 const updateProfile = async (req, res, next) => {
   try {
-    const { name } = req.body;
+    const { name, phone, age, gender } = req.body;
     const user = await User.findByPk(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    
-    await user.update({ name, updatedBy: req.user.id });
+
+    const updates = {};
+    if (name) updates.name = name;
+    if (phone !== undefined) updates.phone = phone;
+    if (age !== undefined && age !== null && age !== '') updates.age = Number(age);
+    if (gender !== undefined) updates.gender = gender;
+
+    await user.update({ ...updates, updatedBy: req.user.id });
     const userJson = user.toJSON();
     delete userJson.passwordHash;
     res.json({ success: true, data: userJson });
+  } catch (err) { next(err); }
+};
+
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Both current and new password are required.' });
+    }
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const match = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!match) return res.status(400).json({ success: false, message: 'Current password is incorrect.' });
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await user.update({ passwordHash, updatedBy: req.user.id });
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (err) { next(err); }
+};
+
+const updateAddress = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const address = await UserAddress.findOne({
+      where: { id, userId: req.user.id, tenantId: req.tenant.id },
+    });
+    if (!address) return res.status(404).json({ success: false, message: 'Address not found.' });
+
+    const payload = req.body || {};
+    if (payload.isDefault) {
+      await UserAddress.update({ isDefault: false }, {
+        where: { userId: req.user.id, tenantId: req.tenant.id },
+      });
+    }
+
+    await address.update({ ...payload, updatedBy: req.user.id });
+    res.json({ success: true, data: address });
+  } catch (err) { next(err); }
+};
+
+const deleteAddress = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const deleted = await UserAddress.destroy({
+      where: { id, userId: req.user.id, tenantId: req.tenant.id },
+    });
+    if (!deleted) return res.status(404).json({ success: false, message: 'Address not found.' });
+    res.json({ success: true, message: 'Address deleted.' });
   } catch (err) { next(err); }
 };
 
@@ -94,4 +163,13 @@ const getUserViews = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { listUsers, getProfile, updateProfile, addAddress, getUserViews };
+module.exports = {
+  listUsers,
+  getProfile,
+  updateProfile,
+  addAddress,
+  getUserViews,
+  changePassword,
+  updateAddress,
+  deleteAddress,
+};

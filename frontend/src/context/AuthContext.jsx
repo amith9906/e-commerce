@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/client';
+import FullPageLoader from '../components/FullPageLoader';
 
 const AuthContext = createContext();
 
@@ -27,12 +28,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.clear();
+    sessionStorage.clear();
     setToken(null);
     setUser(null);
   };
 
-  if (loading) return <div>Loading account...</div>;
+  if (loading) return <FullPageLoader message="Loading account…" />;
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout }}>

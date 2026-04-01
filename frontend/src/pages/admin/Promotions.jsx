@@ -2,19 +2,26 @@ import { useState, useEffect } from 'react';
 import api from '../../api/client';
 import { toast } from 'react-toastify';
 import { Plus, Trash2, Zap } from 'lucide-react';
+import { formatCurrency } from '../../utils/formatCurrency';
+import { useBrand } from '../../context/BrandContext';
+
+const initialFormState = {
+  name: '',
+  description: '',
+  discountType: 'percentage',
+  discountValue: 0,
+  conditionValue: 5000,
+  validFrom: '',
+  validTo: '',
+  isActive: true
+};
 
 export default function Promotions() {
   const [promotions, setPromotions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    discountType: 'percentage',
-    discountValue: 0,
-    minOrderAmount: 5000,
-    isActive: true
-  });
+  const [formData, setFormData] = useState(initialFormState);
+  const { currency = 'INR' } = useBrand();
 
   useEffect(() => {
     fetchPromotions();
@@ -31,14 +38,45 @@ export default function Promotions() {
     }
   };
 
+  const formatPromoDate = (value) =>
+    value ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : null;
+
+  const getPromoStatus = (promo) => {
+    const now = new Date();
+    const start = promo.validFrom ? new Date(promo.validFrom) : null;
+    const end = promo.validTo ? new Date(promo.validTo) : null;
+    if (start && start > now) return 'upcoming';
+    if (end && end < now) return 'expired';
+    return 'active';
+  };
+
+  const statusStyles = {
+    active: { background: '#dcfce7', color: '#166534' },
+    upcoming: { background: '#fef9c3', color: '#92400e' },
+    expired: { background: '#fee2e2', color: '#991b1b' }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (formData.validFrom && formData.validTo && new Date(formData.validTo) < new Date(formData.validFrom)) {
+      toast.error('End date must be after the start date');
+      return;
+    }
+
     try {
-      const res = await api.post('/promotions', formData);
+      const payload = {
+        ...formData,
+        conditionValue: Number(formData.conditionValue),
+        discountValue: Number(formData.discountValue),
+        validFrom: formData.validFrom ? new Date(formData.validFrom).toISOString() : null,
+        validTo: formData.validTo ? new Date(formData.validTo).toISOString() : null
+      };
+      const res = await api.post('/promotions', payload);
       if (res.success) {
         toast.success('Promotion created successfully');
         setShowAddForm(false);
         fetchPromotions();
+        setFormData({ ...initialFormState });
       }
     } catch (err) {
       toast.error(err.message || 'Failed to create promotion');
@@ -114,13 +152,33 @@ export default function Promotions() {
               />
             </div>
             <div>
-              <label className="label">Min Order Amount ($)</label>
+              <label className="label">Minimum Order ({currency})</label>
               <input 
                 type="number" 
                 className="input-field" 
-                required
-                value={formData.minOrderAmount}
-                onChange={(e) => setFormData({...formData, minOrderAmount: e.target.value})}
+                required 
+                min="0"
+                step="1"
+                value={formData.conditionValue}
+                onChange={(e) => setFormData({...formData, conditionValue: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="label">Starts (optional)</label>
+              <input
+                type="datetime-local"
+                className="input-field"
+                value={formData.validFrom}
+                onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label">Ends (optional)</label>
+              <input
+                type="datetime-local"
+                className="input-field"
+                value={formData.validTo}
+                onChange={(e) => setFormData({ ...formData, validTo: e.target.value })}
               />
             </div>
             <button type="submit" className="btn-primary" style={{ gridColumn: 'span 2', marginTop: '1rem' }}>Create Promotion</button>
@@ -132,28 +190,57 @@ export default function Promotions() {
         <p>Loading promotions...</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-          {promotions.map(promo => (
-            <div key={promo.id} className="card" style={{ borderLeft: promo.isActive ? '4px solid #10b981' : '4px solid #94a3b8' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: promo.isActive ? '#10b981' : 'var(--text-muted)' }}>
-                  <Zap size={20} fill={promo.isActive ? '#10b981' : 'none'} />
-                  <span style={{ fontWeight: 600, fontSize: '1rem' }}>{promo.name}</span>
+          {promotions.map((promo) => {
+            const status = getPromoStatus(promo);
+            const statusLabel = `${status.charAt(0).toUpperCase()}${status.slice(1)}`;
+            const scheduleStyle = statusStyles[status] || statusStyles.active;
+            const startsAt = promo.validFrom ? `Starts ${formatPromoDate(promo.validFrom)}` : 'Starts immediately';
+            const endsAt = promo.validTo ? `Ends ${formatPromoDate(promo.validTo)}` : 'No end date';
+            const discountDisplay =
+              promo.discountType === 'percentage'
+                ? `${promo.discountValue ?? 0}%`
+                : formatCurrency(promo.discountValue ?? 0, currency);
+            return (
+              <div key={promo.id} className="card" style={{ borderLeft: promo.isActive ? '4px solid #10b981' : '4px solid #94a3b8' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: promo.isActive ? '#10b981' : 'var(--text-muted)' }}>
+                    <Zap size={20} fill={promo.isActive ? '#10b981' : 'none'} />
+                    <span style={{ fontWeight: 600, fontSize: '1rem' }}>{promo.name}</span>
+                  </div>
+                  <button onClick={() => handleDelete(promo.id)} style={{ color: '#ef4444' }}><Trash2 size={18} /></button>
                 </div>
-                <button onClick={() => handleDelete(promo.id)} style={{ color: '#ef4444' }}><Trash2 size={18} /></button>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{promo.description}</p>
+                <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '4px', fontSize: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Discount:</span>
+                    <span style={{ fontWeight: 600 }}>{discountDisplay}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Condition:</span>
+                    <span style={{ fontWeight: 600 }}>Spend {formatCurrency(promo.conditionValue || 0, currency)}+</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        ...scheduleStyle,
+                        borderRadius: '999px',
+                        padding: '0.2rem 0.75rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {statusLabel}
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem', color: '#475569' }}>
+                      <span>{startsAt}</span>
+                      <span>{endsAt}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{promo.description}</p>
-              <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '4px', fontSize: '0.875rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span>Discount:</span>
-                  <span style={{ fontWeight: 600 }}>{promo.discountType === 'percentage' ? `${promo.discountValue}%` : `$${promo.discountValue}`}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Condition:</span>
-                  <span style={{ fontWeight: 600 }}>Orders {'>'} ${promo.minOrderAmount}</span>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {promotions.length === 0 && (
             <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
               No automatic promotions configured yet.

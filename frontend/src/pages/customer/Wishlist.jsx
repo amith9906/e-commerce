@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { Heart, ShoppingBag, Trash2, ShoppingCart, ArrowLeft } from 'lucide-react';
+import { getProductCover } from '../../utils/productImage';
 
 export default function Wishlist() {
   const { wishlistItems, removeFromWishlist, addToCart } = useCart();
@@ -52,11 +53,7 @@ export default function Wishlist() {
             </button>
 
             <Link to={`/products/${product.id}`} style={{ display: 'block', height: '240px', backgroundColor: '#f8fafc' }}>
-              {product.images && product.images.length > 0 ? (
-                <img src={product.images[0]} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>No Image</div>
-              )}
+              <img src={getProductCover(product.images)} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </Link>
 
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>

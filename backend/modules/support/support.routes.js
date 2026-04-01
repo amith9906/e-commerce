@@ -5,13 +5,15 @@ const validate = require('../../middleware/validate');
 const authenticate = require('../../middleware/authenticate');
 const isAdmin = require('../../middleware/isAdmin'); // Assuming this exists or using role checks
 const resolveTenant = require('../../middleware/resolveTenant');
-const { submitContact, getInquiries, updateInquiryStatus } = require('./support.controller');
+const auditLogger = require('../../middleware/auditLogger');
+const { submitContact, getInquiries, updateInquiryStatus, listOwnMessages } = require('./support.controller');
 
 const router = express.Router();
 
 router.use(resolveTenant);
 
 router.post('/',
+  auditLogger('support:create', 'ContactMessage'),
   [
     body('name').notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -22,14 +24,23 @@ router.post('/',
   submitContact
 );
 
+router.get('/me',
+  authenticate,
+  auditLogger('support:listOwn', 'ContactMessage'),
+  listOwnMessages
+);
+
 router.get('/',
   authenticate,
-  // We should check for admin role here if we had the middleware
+  isAdmin,
+  auditLogger('support:list', 'ContactMessage'),
   getInquiries
 );
 
 router.patch('/:id/status',
   authenticate,
+  isAdmin,
+  auditLogger('support:updateStatus', 'ContactMessage'),
   [
     param('id').isUUID(),
     body('status').isIn(['new', 'read', 'resolved']),

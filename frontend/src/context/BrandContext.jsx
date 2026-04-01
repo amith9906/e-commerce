@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api/client';
+import api, { cachedGet } from '../api/client';
+import FullPageLoader from '../components/FullPageLoader';
 
 const BrandContext = createContext();
 
@@ -8,17 +9,35 @@ export const BrandProvider = ({ children }) => {
     storeName: 'E-Commerce Store',
     primaryColor: '#3b82f6',
     logoUrl: null,
+    currency: 'INR',
+    settings: {},
+    socialLinks: {
+      facebookUrl: '',
+      instagramUrl: '',
+      youtubeUrl: '',
+      showFacebook: false,
+      showInstagram: false,
+      showYoutube: false,
+    }
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // In dev, tenant slug is usually read from local storage or URL
-    // Here we use the axios interceptor which sends the right header based on local storage
-    api.get('/brand')
-      .then((res) => {
+    (async () => {
+      try {
+        const res = await cachedGet('/brand', { cacheTTL: 120_000 });
         if (res.data) {
-          setBrand((prev) => ({ ...prev, ...res.data }));
-          
+          setBrand((prev) => {
+            const fetchedSettings = res.data.settings || prev.settings || {};
+            const resolvedCurrency = fetchedSettings.currency || res.data.currency || prev.currency || 'INR';
+            return {
+              ...prev,
+              ...res.data,
+              settings: fetchedSettings,
+              currency: resolvedCurrency,
+            };
+          });
+
           // Inject CSS variables
           if (res.data.primaryColor) {
             document.documentElement.style.setProperty('--primary-color', res.data.primaryColor);
@@ -27,12 +46,15 @@ export const BrandProvider = ({ children }) => {
             document.title = res.data.storeName;
           }
         }
-      })
-      .catch((err) => console.error('Failed to load brand config', err))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        console.error('Failed to load brand config', err);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  if (loading) return <div>Loading store configuration...</div>;
+  if (loading) return <FullPageLoader message="Loading store configuration…" />;
 
   return (
     <BrandContext.Provider value={brand}>

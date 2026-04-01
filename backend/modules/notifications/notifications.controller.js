@@ -1,5 +1,6 @@
 'use strict';
 const { Notification } = require('../../models');
+const { notificationEmitter } = require('../../utils/notificationEmitter');
 
 // GET /api/notifications
 // Admin/Customer: list own notifications + broadcasts
@@ -24,6 +25,25 @@ const getNotifications = async (req, res, next) => {
 
     res.json({ success: true, data: rows, pagination: { total: count, page, pages: Math.ceil(count / limit) } });
   } catch (err) { next(err); }
+};
+
+const streamNotifications = (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const sendNotification = (payload) => {
+    const tenantMatches = payload?.tenantId === req.tenant.id;
+    const userMatches = !payload?.userId || payload.userId === req.user.id;
+    if (!tenantMatches || !userMatches) return;
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  };
+
+  notificationEmitter.on('newNotification', sendNotification);
+  req.on('close', () => {
+    notificationEmitter.off('newNotification', sendNotification);
+  });
 };
 
 // PATCH /api/notifications/:id/read
@@ -52,8 +72,8 @@ const broadcast = async (req, res, next) => {
       createdBy: req.user.id,
       updatedBy: req.user.id
     });
+    notificationEmitter.emit('newNotification', notification.toJSON ? notification.toJSON() : notification);
     res.status(201).json({ success: true, data: notification });
   } catch (err) { next(err); }
 };
-
-module.exports = { getNotifications, markAsRead, broadcast };
+module.exports = { getNotifications, markAsRead, broadcast, streamNotifications };

@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../api/client';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { Shield, ShieldAlert, User as UserIcon, ShoppingBag, ChevronDown, ChevronUp, MapPin, Phone, Mail, Calendar } from 'lucide-react';
+import PaginationControls from '../../components/PaginationControls';
 
 dayjs.extend(relativeTime);
 
@@ -14,26 +15,45 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [expandedUserId, setExpandedUserId] = useState(null);
   
-  // Pagination
+  // Filters & pagination
+  const [filters, setFilters] = useState({ search: '', role: '', status: 'all' });
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 10;
+  const [pagination, setPagination] = useState({ currentPage: 1, pages: 1, total: 0 });
+  const PAGE_LIMIT = 10;
 
   useEffect(() => {
     fetchUsers();
-  }, [page]);
+  }, [page, filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchUsers = () => {
     setLoading(true);
-    api.get(`/users?page=${page}&limit=${limit}`)
+    const params = { page, limit: PAGE_LIMIT };
+    if (filters.search) params.q = filters.search;
+    if (filters.role) params.role = filters.role;
+    if (filters.status && filters.status !== 'all') params.status = filters.status;
+    api.get('/users', { params })
       .then(res => { 
         if (res.success) {
             setUsers(res.data);
-            if (res.pagination) setTotalPages(res.pagination.pages);
+            const meta = res.pagination || { currentPage: page, pages: 1, total: res.data.length || 0 };
+            setPagination(meta);
+            if (meta.pages && page > meta.pages) {
+              setPage(meta.pages);
+            }
         }
       })
       .catch(err => toast.error('Failed to load users'))
       .finally(() => setLoading(false));
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+    setPage(1);
+  };
+
+  const clearFilters = () => {
+    setFilters({ search: '', role: '', status: 'all' });
+    setPage(1);
   };
 
   const toggleExpand = (userId) => {
@@ -42,9 +62,45 @@ export default function Users() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.025em' }}>User Management</h1>
-        <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Users: {users.length}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.025em' }}>User Management</h1>
+          <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 600 }}>Total Users: {pagination.total || users.length}</div>
+        </div>
+        <div className="card" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', padding: '0.75rem 1rem' }}>
+          <input
+            type="search"
+            className="input-field"
+            placeholder="Search by name or email"
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            style={{ minWidth: '220px' }}
+          />
+          <select
+            className="input-field"
+            value={filters.role}
+            onChange={(e) => handleFilterChange('role', e.target.value)}
+            style={{ width: '180px' }}
+          >
+            <option value="">All roles</option>
+            <option value="customer">Customer</option>
+            <option value="admin">Admin</option>
+            <option value="superadmin">Superadmin</option>
+          </select>
+          <select
+            className="input-field"
+            value={filters.status}
+            onChange={(e) => handleFilterChange('status', e.target.value)}
+            style={{ width: '160px' }}
+          >
+            <option value="all">All statuses</option>
+            <option value="verified">Verified</option>
+            <option value="unverified">Unverified</option>
+          </select>
+          <button type="button" className="btn-secondary" onClick={clearFilters} style={{ justifyContent: 'center' }}>
+            Clear filters
+          </button>
+        </div>
       </div>
       
       <div className="card" style={{ padding: 0, overflow: 'hidden', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
@@ -65,7 +121,7 @@ export default function Users() {
               <tr><td colSpan="5" style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>No users found.</td></tr>
             ) : (
               users.map(user => (
-                <>
+                <Fragment key={user.id}>
                   <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }}>
                     <td style={{ padding: '1.25rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -145,7 +201,7 @@ export default function Users() {
                   </tr>
                   
                   {expandedUserId === user.id && (
-                    <tr style={{ backgroundColor: '#fcfcfd' }}>
+                    <tr key={`${user.id}-details`} style={{ backgroundColor: '#fcfcfd' }}>
                         <td colSpan="5" style={{ padding: '2rem' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem' }}>
                                 <div>
@@ -154,8 +210,8 @@ export default function Users() {
                                     </h4>
                                     {user.addresses && user.addresses.length > 0 ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                            {user.addresses.map((addr, i) => (
-                                                <div key={i} style={{ padding: '1rem', backgroundColor: 'white', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                                            {user.addresses.map((addr) => (
+                                                <div key={addr.id} style={{ padding: '1rem', backgroundColor: 'white', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                                                     <div style={{ fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.25rem' }}>{addr.fullName} <span style={{ fontSize: '0.7rem', color: 'var(--primary-color)', marginLeft: '0.5rem' }}>({addr.label})</span></div>
                                                     <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{addr.addressLine1}, {addr.city}, {addr.state} {addr.postalCode}</div>
                                                     <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{addr.country}</div>
@@ -199,34 +255,13 @@ export default function Users() {
                         </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))
             )}
           </tbody>
         </table>
 
-        {/* Pagination Footer */}
-        {totalPages > 1 && (
-          <div style={{ padding: '1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', gap: '0.5rem', backgroundColor: '#fcfcfd' }}>
-             {[...Array(totalPages)].map((_, i) => (
-                <button
-                   key={i}
-                   onClick={() => setPage(i + 1)}
-                   style={{
-                      width: '36px', height: '36px', borderRadius: '8px', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
-                      border: page === i + 1 ? 'none' : '1px solid var(--border-color)',
-                      backgroundColor: page === i + 1 ? 'var(--primary-color)' : 'white',
-                      color: page === i + 1 ? 'white' : 'var(--text-main)',
-                      transition: '0.2s'
-                   }}
-                >
-                   {i + 1}
-                </button>
-             ))}
-          </div>
-        )}
+        <PaginationControls currentPage={pagination.currentPage || page} totalPages={pagination.pages || 1} onChange={(target) => setPage(target)} />
       </div>
     </div>
   );

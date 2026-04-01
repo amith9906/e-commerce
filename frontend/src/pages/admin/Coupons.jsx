@@ -3,6 +3,7 @@ import api from '../../api/client';
 import { toast } from 'react-toastify';
 import { Plus, Trash2, Calendar, Tag } from 'lucide-react';
 import dayjs from 'dayjs';
+import PaginationControls from '../../components/PaginationControls';
 
 export default function Coupons() {
   const [coupons, setCoupons] = useState([]);
@@ -18,14 +19,25 @@ export default function Coupons() {
     usageLimit: 100
   });
 
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ currentPage: 1, pages: 1, total: 0 });
+  const PAGE_LIMIT = 10;
+
   useEffect(() => {
     fetchCoupons();
-  }, []);
+  }, [page]);
 
   const fetchCoupons = async () => {
+    setLoading(true);
     try {
-      const res = await api.get('/coupons');
+      const res = await api.get('/coupons', { params: { page, limit: PAGE_LIMIT } });
       if (res.success) setCoupons(res.data);
+      if (res.pagination) {
+        setPagination(res.pagination);
+        if (res.pagination.pages && page > res.pagination.pages) {
+          setPage(res.pagination.pages);
+        }
+      }
     } catch (err) {
       toast.error('Failed to load coupons');
     } finally {
@@ -179,9 +191,14 @@ export default function Coupons() {
                 <tr><td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No coupons found.</td></tr>
               )}
             </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
+        </table>
+        <PaginationControls
+          currentPage={pagination.currentPage || page}
+          totalPages={pagination.pages || 1}
+          onChange={(targetPage) => setPage(targetPage)}
+        />
+      </div>
+    )}
+  </div>
+);
 }

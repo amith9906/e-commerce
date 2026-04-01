@@ -1,34 +1,51 @@
 'use strict';
+const { Op } = require('sequelize');
 const { Tenant } = require('../models');
 
 /**
- * Resolves tenant from the X-Tenant-Slug header (dev) or subdomain (prod).
+ * Resolves tenant from:
+ * 1. X-Tenant-Slug header (dev / API clients)
+ * 2. Custom domain (e.g. shop.mybrand.com)
+ * 3. Subdomain of the SaaS domain (e.g. acme.yoursaas.com)
+ *
  * Attaches req.tenant to the request.
  */
 const resolveTenant = async (req, res, next) => {
   try {
-    let slug;
+    let tenant = null;
 
-    // Prefer explicit header (useful in dev / non-subdomain environments)
+    // 1. Explicit header (useful in dev / non-subdomain environments)
     if (req.headers['x-tenant-slug']) {
-      slug = req.headers['x-tenant-slug'];
-    } else {
-      // Extract from subdomain: tenant1.yourdomain.com → tenant1
-      const host = req.headers.host || '';
-      const parts = host.split('.');
-      if (parts.length >= 3) {
-        slug = parts[0];
+      const slug = req.headers['x-tenant-slug'];
+      tenant = await Tenant.findOne({ where: { slug } });
+    }
+
+    if (!tenant && req.query?.tenantSlug) {
+      tenant = await Tenant.findOne({ where: { slug: req.query.tenantSlug } });
+    }
+
+    // 2. Try custom domain match
+    if (!tenant) {
+      const host = (req.headers.host || '').split(':')[0]; // strip port
+      const saasDomain = process.env.SAAS_DOMAIN || '';
+
+      // Check if host is a custom domain (not a subdomain of SaaS domain)
+      const isSubdomainOfSaas = saasDomain && host.endsWith(`.${saasDomain}`);
+      if (!isSubdomainOfSaas && host && host !== saasDomain) {
+        tenant = await Tenant.findOne({ where: { customDomain: host } });
+      }
+
+      // 3. Subdomain-based resolution: tenant.yoursaas.com
+      if (!tenant && isSubdomainOfSaas) {
+        const slug = host.replace(`.${saasDomain}`, '');
+        if (slug) {
+          tenant = await Tenant.findOne({ where: { slug } });
+        }
       }
     }
 
-    if (!slug) {
-      return res.status(400).json({ success: false, message: 'Tenant could not be resolved.' });
-    }
-
-    const tenant = await Tenant.findOne({ where: { slug } });
-
     if (!tenant) {
-      return res.status(404).json({ success: false, message: 'Tenant not found.' });
+      return res.status(400).json({ success: false, message: 'Tenant could not be resolved.' });
     }
 
     if (tenant.status === 'suspended') {

@@ -5,8 +5,8 @@ const sequelize = require('../config/database');
 const SalesPersonPerformanceSummary = sequelize.define(
   'SalesPersonPerformanceSummary',
   {
-    tenantId: { type: DataTypes.UUID, allowNull: false, field: 'tenant_id' },
-    salesPersonId: { type: DataTypes.UUID, allowNull: false, field: 'sales_person_id' },
+    tenantId: { type: DataTypes.UUID, allowNull: false, field: 'tenant_id', primaryKey: true },
+    salesPersonId: { type: DataTypes.UUID, allowNull: false, field: 'sales_person_id', primaryKey: true },
     totalUnits: { type: DataTypes.INTEGER, allowNull: false, field: 'total_units', defaultValue: 0 },
     totalAmount: { type: DataTypes.DECIMAL(18, 2), allowNull: false, field: 'total_amount', defaultValue: 0 },
     createdAt: { type: DataTypes.DATE, allowNull: false, field: 'created_at', defaultValue: DataTypes.NOW },
@@ -14,7 +14,8 @@ const SalesPersonPerformanceSummary = sequelize.define(
   },
   {
     tableName: 'sales_person_performance_summaries',
-    timestamps: false
+    timestamps: false,
+    underscored: true
   }
 );
 

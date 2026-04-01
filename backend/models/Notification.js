@@ -12,6 +12,7 @@ const Notification = sequelize.define(
     title: { type: DataTypes.STRING, allowNull: false },
     message: { type: DataTypes.TEXT, allowNull: false },
     isRead: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_read' },
+    referenceId: { type: DataTypes.UUID, allowNull: true, field: 'reference_id' },
     type: { type: DataTypes.ENUM('info', 'warning', 'success', 'broadcast'), defaultValue: 'info' },
     ...auditFields,
   },

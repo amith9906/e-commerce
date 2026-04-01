@@ -11,6 +11,8 @@ const OrderReturn = sequelize.define(
     orderId: { type: DataTypes.UUID, allowNull: false, field: 'order_id' },
     type: { type: DataTypes.ENUM('return', 'replacement'), defaultValue: 'return' },
     reason: { type: DataTypes.TEXT, allowNull: false },
+    customerComment: { type: DataTypes.TEXT, allowNull: true, field: 'customer_comment' },
+    attachments: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] },
     status: { type: DataTypes.ENUM('pending', 'approved', 'rejected', 'completed'), defaultValue: 'pending' },
     adminNotes: { type: DataTypes.TEXT, field: 'admin_notes' },
     ...auditFields,

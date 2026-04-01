@@ -100,7 +100,10 @@ const login = async (req, res, next) => {
     const { email, password } = req.body;
     const tenantId = req.tenant?.id || null;
 
-    const user = await User.findOne({ where: { email, tenantId } });
+    let user = await User.findOne({ where: { email, tenantId } });
+    if (!user && req.headers['x-tenant-slug']) {
+      user = await User.findOne({ where: { email, tenantId: null, role: 'superadmin' } });
+    }
     if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials.' });
     if (!user.isActive) return res.status(403).json({ success: false, message: 'Account disabled.' });
     if (!user.isVerified) return res.status(403).json({ success: false, message: 'Please verify your email first.', userId: user.id });
@@ -118,4 +121,73 @@ const login = async (req, res, next) => {
   }
 };
 
-module.exports = { register, verifyOtp, resendOtp, login };
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const tenantId = req.tenant?.id || null;
+    const where = { email };
+    if (req.tenant) {
+      where.tenantId = tenantId;
+    } else if (!tenantId) {
+      where.tenantId = null;
+    }
+
+    const user = await User.findOne({ where });
+    if (!user) return res.status(404).json({ success: false, message: 'Account not found.' });
+
+    const otp = generateOtp();
+    const expiresAt = new Date(Date.now() + (parseInt(process.env.OTP_EXPIRES_MINUTES) || 10) * 60000);
+    await OtpVerification.create({ userId: user.id, otpCode: otp, expiresAt, createdBy: user.id, updatedBy: user.id });
+
+    await sendMail({
+      to: email,
+      subject: 'Password reset code',
+      html: `<p>Your password reset code is: <strong>${otp}</strong>. It expires in ${process.env.OTP_EXPIRES_MINUTES || 10} minutes.</p>`,
+    });
+
+    res.json({ success: true, message: 'Password reset code sent to your email.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    const tenantId = req.tenant?.id || null;
+    const userCondition = { email };
+    if (tenantId) {
+      userCondition.tenantId = tenantId;
+    } else {
+      userCondition.tenantId = null;
+    }
+
+    const user = await User.findOne({ where: userCondition });
+    if (!user) return res.status(404).json({ success: false, message: 'Account not found.' });
+
+    const record = await OtpVerification.findOne({
+      where: { userId: user.id, otpCode: otp, used: false },
+      order: [['created_at', 'DESC']],
+    });
+    if (!record || new Date() > record.expiresAt) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired code.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await user.update({ passwordHash, updatedBy: user.id });
+    await record.update({ used: true, updatedBy: user.id });
+
+    res.json({ success: true, message: 'Password reset successfully. Please log in with your new password.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  register,
+  verifyOtp,
+  resendOtp,
+  login,
+  forgotPassword,
+  resetPassword,
+};

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import api from '../api/client';
-import { Star, User, MessageCircle, CheckCircle } from 'lucide-react';
+import { Star, User, MessageCircle, CheckCircle, ImageIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function ReviewSection({ productId, productRating, productCount }) {
@@ -11,6 +11,7 @@ export default function ReviewSection({ productId, productRating, productCount }
   const [submitting, setSubmitting] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [files, setFiles] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -39,11 +40,20 @@ export default function ReviewSection({ productId, productRating, productCount }
 
     try {
       setSubmitting(true);
-      const res = await api.post('/reviews', { productId, rating, comment });
+      const formData = new FormData();
+      formData.append('productId', productId);
+      formData.append('rating', rating);
+      formData.append('comment', comment);
+      files.forEach((file) => formData.append('images', file));
+
+      const res = await api.post('/reviews', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       if (res.success) {
         toast.success('Review submitted successfully!');
         setComment('');
         setRating(5);
+        setFiles([]);
         setPage(1);
         fetchReviews();
       }
@@ -115,6 +125,24 @@ export default function ReviewSection({ productId, productRating, productCount }
                     rows="3"
                     style={{ resize: 'none' }}
                   />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.875rem', fontWeight: 500, display: 'block', marginBottom: '0.5rem' }}>Add photos (optional)</label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(e) => setFiles(Array.from(e.target.files))}
+                  />
+                  {files.length > 0 && (
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                      {files.map((file) => (
+                        <div key={file.name} style={{ width: '60px', height: '60px', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden', position: 'relative' }}>
+                          <img src={URL.createObjectURL(file)} alt={file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button 
                   type="submit" 

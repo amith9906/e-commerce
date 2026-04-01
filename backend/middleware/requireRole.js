@@ -9,7 +9,7 @@ const requireRole = (...roles) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Not authenticated.' });
     }
-    if (!allowed.includes(req.user.role)) {
+    if (!allowed.includes(req.user.role) && req.user.role !== 'superadmin') {
       return res.status(403).json({ success: false, message: 'Insufficient permissions.' });
     }
     next();

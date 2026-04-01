@@ -6,7 +6,16 @@ const authenticate = require('../../middleware/authenticate');
 const requireRole = require('../../middleware/requireRole');
 const resolveTenant = require('../../middleware/resolveTenant');
 
-const { listUsers, getProfile, updateProfile, addAddress, getUserViews } = require('./users.controller');
+const {
+  listUsers,
+  getProfile,
+  updateProfile,
+  addAddress,
+  getUserViews,
+  changePassword,
+  updateAddress,
+  deleteAddress,
+} = require('./users.controller');
 
 const router = express.Router();
 
@@ -33,6 +42,37 @@ router.post(
   ],
   validate,
   addAddress
+);
+
+router.patch(
+  '/addresses/:id',
+  [
+    param('id').isUUID().withMessage('Valid address ID is required'),
+    body('label').optional().isString(),
+    body('fullName').optional().isString(),
+    body('city').optional().isString(),
+    body('country').optional().isString(),
+    body('isDefault').optional().isBoolean(),
+  ],
+  validate,
+  updateAddress
+);
+
+router.delete(
+  '/addresses/:id',
+  [param('id').isUUID().withMessage('Valid address ID is required')],
+  validate,
+  deleteAddress
+);
+
+router.post(
+  '/change-password',
+  [
+    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+  ],
+  validate,
+  changePassword
 );
 
 // Admin-only routes

@@ -5,6 +5,7 @@ const validate = require('../../middleware/validate');
 const authenticate = require('../../middleware/authenticate');
 const requireRole = require('../../middleware/requireRole');
 const resolveTenant = require('../../middleware/resolveTenant');
+const upload = require('../../middleware/upload');
 
 const {
   createOrder,
@@ -16,7 +17,8 @@ const {
   requestReturn,
   listReturns,
   updateReturnStatus,
-  updatePaymentStatus
+  updatePaymentStatus,
+  collectCodPayment
 } = require('./orders.controller');
 
 const router = express.Router();
@@ -77,13 +79,26 @@ router.patch(
   updateOrderStatus
 );
 
+router.post(
+  '/:id/cod/collect',
+  requireRole('admin'),
+  [
+    param('id').isUUID().withMessage('Invalid order ID'),
+    body('status').optional().isIn(['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']).withMessage('Invalid status')
+  ],
+  validate,
+  collectCodPayment
+);
+
 // Returns
 router.post(
   '/:id/returns',
+  upload.array('attachments', 4),
   [
     param('id').isUUID().withMessage('Invalid order ID'),
     body('type').isIn(['return', 'replacement']).withMessage('Invalid type'),
-    body('reason').notEmpty().withMessage('Reason is required')
+    body('reason').notEmpty().withMessage('Reason is required'),
+    body('comment').optional().isString()
   ],
   validate,
   requestReturn

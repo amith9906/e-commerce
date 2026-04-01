@@ -16,6 +16,7 @@ const ProductReview = sequelize.define(
       validate: { min: 1, max: 5 } 
     },
     comment: { type: DataTypes.TEXT },
+    images: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] },
     isVerifiedPurchase: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_verified_purchase' },
     ...auditFields,
   },

@@ -4,6 +4,9 @@ const { Op } = require('sequelize');
 const { fn, col } = require('sequelize');
 const { createInvoiceNumber } = require('../../utils/invoiceTemplate');
 
+const getTenantCurrency = (tenant) => tenant?.settings?.currency || 'INR';
+const formatCurrencyForTenant = (value, tenant) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: getTenantCurrency(tenant) }).format(Number(value) || 0);
+
 // GET /api/billing
 const listBillingRecords = async (req, res, next) => {
   try {
@@ -22,9 +25,17 @@ const listBillingRecords = async (req, res, next) => {
       offset: parseInt(offset)
     });
 
+    const currency = getTenantCurrency(req.tenant);
+    const data = records.rows.map((record) => {
+      const row = record.toJSON();
+      row.currency = currency;
+      row.formattedAmount = formatCurrencyForTenant(row.amount, req.tenant);
+      return row;
+    });
+
     res.json({
       success: true,
-      data: records.rows,
+      data,
       pagination: { total: records.count, page: parseInt(page), pages: Math.ceil(records.count / limit) }
     });
   } catch (err) {
@@ -59,7 +70,11 @@ const createManualBilling = async (req, res, next) => {
       updatedBy: req.user.id
     });
 
-    res.status(201).json({ success: true, data: billing });
+    const currency = getTenantCurrency(req.tenant);
+    const payload = billing.toJSON();
+    payload.currency = currency;
+    payload.formattedAmount = formatCurrencyForTenant(billing.amount, req.tenant);
+    res.status(201).json({ success: true, data: payload });
   } catch (err) {
     next(err);
   }
@@ -80,9 +95,13 @@ const getBillingInvoice = async (req, res, next) => {
     if (!record) return res.status(404).json({ success: false, message: 'Billing record not found.' });
 
     const filename = `invoice-${record.invoiceNumber || record.id}.json`;
+    const currency = getTenantCurrency(req.tenant);
+    const payload = record.toJSON();
+    payload.currency = currency;
+    payload.formattedAmount = formatCurrencyForTenant(record.amount, req.tenant);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.json({ success: true, data: record });
+    res.json({ success: true, data: payload });
   } catch (err) {
     next(err);
   }
@@ -101,11 +120,14 @@ const exportBillingRecords = async (req, res, next) => {
       order: [['due_date', 'ASC']]
     });
 
-    const header = ['Invoice Number', 'Store', 'Amount', 'Payment Status', 'Due Date'];
+    const currency = getTenantCurrency(req.tenant);
+
+    const header = ['Invoice Number', 'Store', 'Amount', 'Currency', 'Payment Status', 'Due Date'];
     const rows = records.map((record) => [
       record.invoiceNumber || record.id,
       record.store?.name || 'Unknown store',
       record.amount?.toString() || '0',
+      currency,
       record.paymentStatus,
       record.dueDate ? record.dueDate.toISOString().split('T')[0] : 'N/A'
     ]);
@@ -131,7 +153,15 @@ const getStoreRevenue = async (req, res, next) => {
       group: ['store_id', 'store.id', 'store.name'],
       include: [{ association: 'store', attributes: ['name'] }]
     });
-    res.json({ success: true, data: revenue });
+    const currency = getTenantCurrency(req.tenant);
+    const data = revenue.map((row) => ({
+      storeId: row.store_id,
+      storeName: row.store?.name || 'Unknown store',
+      totalRevenue: Number(row.get('totalRevenue')) || 0,
+      formattedRevenue: formatCurrencyForTenant(row.get('totalRevenue'), req.tenant),
+      currency
+    }));
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

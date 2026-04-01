@@ -23,7 +23,17 @@ const getPayments = async (req, res, next) => {
       offset: parseInt(offset),
     });
 
-    res.json({ success: true, data: rows, pagination: { total: count, page, pages: Math.ceil(count / limit) } });
+    const sanitizedRows = rows.map(payment => {
+      const p = payment.toJSON();
+      if (p.metadata) {
+        // Only return non-sensitive fields to the frontend
+        const { gatewayResponse, ...safeMetadata } = p.metadata;
+        p.metadata = safeMetadata;
+      }
+      return p;
+    });
+
+    res.json({ success: true, data: sanitizedRows, pagination: { total: count, page, pages: Math.ceil(count / limit) } });
   } catch (err) { next(err); }
 };
 

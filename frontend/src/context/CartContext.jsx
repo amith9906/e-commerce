@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import { getProductCover } from '../utils/productImage';
 
 const CartContext = createContext();
 
@@ -22,36 +23,61 @@ export const CartProvider = ({ children }) => {
     localStorage.setItem('wishlist', JSON.stringify(wishlistItems));
   }, [wishlistItems]);
 
-  const addToCart = (product, quantity = 1) => {
+  const resolveProductPricing = (product) => {
+    const basePrice = Number(product.price) || 0;
+    const salePrice = product.salePrice !== undefined && product.salePrice !== null ? Number(product.salePrice) : null;
+    const finalPrice = salePrice !== null && salePrice < basePrice ? salePrice : basePrice;
+    return { finalPrice, basePrice, salePrice };
+  };
+
+  const addToCart = (product, quantity = 1, size = null, color = null) => {
+    const pricing = resolveProductPricing(product);
     setCartItems(prev => {
-      const existing = prev.find(item => item.productId === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.productId === product.id 
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
-      }
-      return [...prev, { 
-        productId: product.id, 
-        name: product.name, 
-        price: product.price, 
-        imageUrl: product.images && product.images.length > 0 ? product.images[0] : null,
+      let updated = false;
+      const items = prev.map(item => {
+        if (item.productId === product.id && item.size === size && item.color === color) {
+          updated = true;
+          return {
+            ...item,
+            quantity: item.quantity + quantity,
+            price: pricing.finalPrice,
+            basePrice: pricing.basePrice,
+            salePrice: pricing.salePrice
+          };
+        }
+        return item;
+      });
+
+      if (updated) return items;
+
+      return [...prev, {
+        productId: product.id,
+        name: product.name,
+        price: pricing.finalPrice,
+        basePrice: pricing.basePrice,
+        salePrice: pricing.salePrice,
+        imageUrl: getProductCover(product.images),
         brand: product.brand,
-        quantity 
+        size,
+        color,
+        quantity
       }];
     });
     toast.success('Added to cart');
   };
 
-  const removeFromCart = (productId) => {
-    setCartItems(prev => prev.filter(item => item.productId !== productId));
+  const removeFromCart = (productId, size = null, color = null) => {
+    setCartItems(prev => prev.filter(item => 
+        !(item.productId === productId && item.size === size && item.color === color)
+    ));
   };
 
-  const updateQuantity = (productId, quantity) => {
-    if (quantity < 1) return removeFromCart(productId);
+  const updateQuantity = (productId, quantity, size = null, color = null) => {
+    if (quantity < 1) return removeFromCart(productId, size, color);
     setCartItems(prev => prev.map(item => 
-      item.productId === productId ? { ...item, quantity } : item
+      (item.productId === productId && item.size === size && item.color === color) 
+        ? { ...item, quantity } 
+        : item
     ));
   };
 

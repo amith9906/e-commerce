@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
 import { LogOut, Truck, MapPin, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-
-const formatCurrency = (value) =>
-  Number.isNaN(Number(value)) ? '-' : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value);
+import { useBrand } from '../../context/BrandContext';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 export default function SalespersonDashboard() {
   const { user, logout } = useAuth();
+  const { currency = 'INR' } = useBrand();
   const [assignments, setAssignments] = useState([]);
   const [pendingTransfers, setPendingTransfers] = useState([]);
   const [kpi, setKpi] = useState(null);
@@ -113,7 +113,7 @@ export default function SalespersonDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', marginBottom: '0.5rem' }}>
             <Truck size={18} /> Total Revenue
           </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>{kpi ? formatCurrency(kpi.totalRevenue) : '--'}</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 700 }}>{kpi ? formatCurrency(kpi.totalRevenue, currency) : '--'}</div>
         </article>
       </section>
 

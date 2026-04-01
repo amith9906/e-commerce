@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { useBrand } from '../../context/BrandContext';
 import { Trash2, Heart, ArrowRight, ShoppingBag } from 'lucide-react';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 export default function Cart() {
   const { cartItems, removeFromCart, updateQuantity, cartTotal, clearCart, addToWishlist } = useCart();
+  const { currency = 'INR' } = useBrand();
 
   const handleMoveToWishlist = (item) => {
     addToWishlist({
@@ -45,7 +48,7 @@ export default function Cart() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <div className="responsive-stack">
         
         {/* Cart Items List */}
         <div style={{ flex: '1 1 65%' }}>
@@ -72,7 +75,7 @@ export default function Cart() {
                             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>{item.name}</h3>
                         </Link>
                     </div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>${Number(item.price).toFixed(2)}</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>{formatCurrency(item.price, currency)}</div>
                 </div>
                 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '1rem' }}>
@@ -115,7 +118,7 @@ export default function Cart() {
             
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
                 <span>Subtotal ({cartItems.length} items)</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>${cartTotal.toFixed(2)}</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{formatCurrency(cartTotal, currency)}</span>
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
@@ -125,12 +128,12 @@ export default function Cart() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
                 <span>Tax</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>$0.00</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{formatCurrency(0, currency)}</span>
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '2px dashed var(--border-color)', fontWeight: 800, fontSize: '1.5rem', color: 'var(--text-main)' }}>
                 <span>Total</span>
-                <span>${cartTotal.toFixed(2)}</span>
+                <span>{formatCurrency(cartTotal, currency)}</span>
             </div>
 
             <Link to="/checkout" className="btn-primary" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', height: '3.5rem', marginTop: '2.5rem', borderRadius: '16px', fontSize: '1.125rem', fontWeight: 700 }}>

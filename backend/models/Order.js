@@ -20,6 +20,9 @@ const Order = sequelize.define(
     couponId: { type: DataTypes.UUID, allowNull: true, field: 'coupon_id' },
     discountAmount: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0, field: 'discount_amount' },
     shippingFee: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0, field: 'shipping_fee' },
+    taxRate: { type: DataTypes.DECIMAL(5, 2), defaultValue: 0, field: 'tax_rate' },
+    taxAmount: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0, field: 'tax_amount' },
+    taxLabel: { type: DataTypes.STRING, allowNull: true, field: 'tax_label' },
     ...auditFields,
   },
   { ...auditOptions, tableName: 'orders' }

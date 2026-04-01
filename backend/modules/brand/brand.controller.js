@@ -14,6 +14,48 @@ const getBrandConfig = async (req, res, next) => {
       return acc;
     }, {});
     
+    const tenantCurrency = req.tenant?.settings?.currency || 'INR';
+    if (!brand.currency) {
+      brand.currency = tenantCurrency;
+    }
+    const tenantSettings = req.tenant?.settings || {};
+    brand.settings = tenantSettings;
+    if (!brand.currency) {
+      brand.currency = tenantSettings.currency || 'INR';
+    }
+    brand.supportContacts = tenantSettings.supportContacts || brand.supportContacts || {
+      email: `support@${req.tenant?.slug || 'brand'}.com`,
+      phone: '+91 0000000000'
+    };
+    const defaultSocialLinks = {
+      facebookUrl: '',
+      instagramUrl: '',
+      youtubeUrl: '',
+      showFacebook: false,
+      showInstagram: false,
+      showYoutube: false,
+    };
+    const parseSocialLinks = (value) => {
+      if (!value) return null;
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          return typeof parsed === 'object' ? parsed : null;
+        } catch {
+          return null;
+        }
+      }
+      if (typeof value === 'object') return value;
+      return null;
+    };
+    const storedSocial = parseSocialLinks(brand.socialLinks) || {};
+    const tenantSocial = parseSocialLinks(tenantSettings.socialLinks) || {};
+    brand.socialLinks = {
+      ...defaultSocialLinks,
+      ...storedSocial,
+      ...tenantSocial
+    };
+
     res.json({ success: true, data: brand });
   } catch (err) { next(err); }
 };

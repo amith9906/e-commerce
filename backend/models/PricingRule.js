@@ -14,6 +14,7 @@ const PricingRule = sequelize.define(
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_active' },
     startDate: { type: DataTypes.DATE, allowNull: true, field: 'start_date' },
     endDate: { type: DataTypes.DATE, allowNull: true, field: 'end_date' },
+    productId: { type: DataTypes.UUID, allowNull: true, field: 'product_id' },
     storeId: { type: DataTypes.UUID, allowNull: true, field: 'store_id' },
     ...auditFields,
   },

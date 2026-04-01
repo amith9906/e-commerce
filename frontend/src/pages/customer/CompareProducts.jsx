@@ -3,6 +3,7 @@ import { useLocation, Link } from 'react-router-dom';
 import api from '../../api/client';
 import { ShoppingCart, ArrowLeft, X } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { getProductCover } from '../../utils/productImage';
 
 export default function CompareProducts() {
   const [products, setProducts] = useState([]);
@@ -60,7 +61,7 @@ export default function CompareProducts() {
                 <th key={p.id} style={{ padding: '2rem', borderBottom: '2px solid var(--border-color)', verticalAlign: 'top' }}>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ width: '120px', height: '120px', margin: '0 auto 1rem', background: '#f1f5f9', borderRadius: '8px', overflow: 'hidden' }}>
-                      {p.images?.[0] && <img src={p.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                      <img src={getProductCover(p.images)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                     <Link to={`/products/${p.id}`} style={{ display: 'block', fontWeight: 600, color: 'var(--text-main)', marginBottom: '1rem', height: '3rem', overflow: 'hidden' }}>
                       {p.name}
