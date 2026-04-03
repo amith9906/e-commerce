@@ -15,6 +15,7 @@ const ALLOWED_SETTINGS = new Set([
   'statusEmailTemplates',
   'cartRecoveryTemplate',
   'codEnabled',
+  'shipping',
   'loyalty',
   'companyName',
   'companyAddress',
@@ -22,6 +23,18 @@ const ALLOWED_SETTINGS = new Set([
   'companyWebsite',
   'invoiceNotes'
 ]);
+const DEFAULT_SHIPPING_CONFIG = {
+  freeShippingThreshold: 2000,
+  flatShippingFee: 50,
+  pinValidationMode: 'postal',
+  origin: { country: 'India', state: '', city: '' },
+  rates: {
+    sameCity: 20,
+    sameState: 40,
+    outOfState: 60,
+    international: 120
+  }
+};
 
 const filterSettings = (payload = {}) => {
   if (!payload || typeof payload !== 'object') return {};
@@ -76,6 +89,45 @@ const updateTenantSettings = async (req, res, next) => {
         ...req.tenant?.settings?.loyalty,
         ...filtered.loyalty
       };
+    }
+
+    if (filtered.shipping) {
+      const existingShipping = {
+        ...DEFAULT_SHIPPING_CONFIG,
+        ...(req.tenant?.settings?.shipping || {})
+      };
+      const mergedOrigin = {
+        ...existingShipping.origin,
+        ...(filtered.shipping.origin || {})
+      };
+      const mergedRates = {
+        ...existingShipping.rates,
+        ...(filtered.shipping.rates || {})
+      };
+      filtered.shipping = {
+        ...existingShipping,
+        ...filtered.shipping,
+        origin: mergedOrigin,
+        rates: mergedRates
+      };
+      const threshold = Number(filtered.shipping.freeShippingThreshold ?? existingShipping.freeShippingThreshold);
+      const flatFee = Number(filtered.shipping.flatShippingFee ?? existingShipping.flatShippingFee);
+      filtered.shipping.freeShippingThreshold = !Number.isNaN(threshold) ? Math.max(0, threshold) : existingShipping.freeShippingThreshold;
+      filtered.shipping.flatShippingFee = !Number.isNaN(flatFee) ? Math.max(0, flatFee) : existingShipping.flatShippingFee;
+      filtered.shipping.origin = {
+        country: (filtered.shipping.origin?.country || existingShipping.origin.country || '').trim(),
+        state: (filtered.shipping.origin?.state || existingShipping.origin.state || '').trim(),
+        city: (filtered.shipping.origin?.city || existingShipping.origin.city || '').trim()
+      };
+      const sanitizedRates = {};
+      ['sameCity', 'sameState', 'outOfState', 'international'].forEach((key) => {
+        const amount = Number(filtered.shipping.rates?.[key] ?? existingShipping.rates?.[key] ?? 0);
+        sanitizedRates[key] = (!Number.isNaN(amount) && amount >= 0) ? amount : (existingShipping.rates?.[key] ?? 0);
+      });
+      filtered.shipping.rates = sanitizedRates;
+      const allowedPinModes = new Set(['postal', 'city', 'state', 'country']);
+      const sanitizedPinMode = filtered.shipping.pinValidationMode || existingShipping.pinValidationMode;
+      filtered.shipping.pinValidationMode = allowedPinModes.has(sanitizedPinMode) ? sanitizedPinMode : existingShipping.pinValidationMode;
     }
 
     const updatedSettings = {

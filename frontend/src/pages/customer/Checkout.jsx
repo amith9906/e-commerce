@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useBrand } from '../../context/BrandContext';
 import { CreditCard, CheckCircle, ShieldCheck, QrCode, ArrowRight, Loader } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatCurrency';
+import { calculateShippingFee, determineShippingZone, describeShippingZone } from '../../utils/shipping';
 
 export default function Checkout() {
   const { cartItems, cartTotal, clearCart } = useCart();
@@ -58,6 +59,17 @@ export default function Checkout() {
       : paymentGatewayKey === 'mock'
         ? 'Demo gateway'
         : paymentGatewayKey;
+  const shippingSettings = brandSettings?.shipping || {};
+  const selectedSavedAddress = addresses.find((addr) => addr.id === selectedAddressId);
+  const shippingAddressForCalc = selectedAddressId === 'new' || !selectedSavedAddress
+    ? { city: watchedCity, state: watchedState, country: watchedCountry, postalCode: watchedPostal }
+    : selectedSavedAddress;
+  const shippingZone = determineShippingZone(shippingSettings.origin || {}, shippingAddressForCalc);
+  const shippingFee = calculateShippingFee({ shippingSettings, address: shippingAddressForCalc, cartTotal });
+  const shippingZoneLabel = describeShippingZone(shippingZone);
+  const shippingZoneMessage = shippingAddressForCalc?.country
+    ? shippingZoneLabel
+    : 'Enter an address to calculate the shipping zone.';
 
   useEffect(() => {
     if (!codEnabled && selectedPaymentMethod === 'cod') {
@@ -237,7 +249,6 @@ export default function Checkout() {
 
   const taxRate = Number(brandSettings?.taxRate || 0);
   const taxLabel = brandSettings?.taxLabel || 'Tax';
-  const shippingFee = cartTotal > 2000 ? 0 : 50;
   const discountAmount = appliedCoupon?.discount || 0;
   const taxableAmount = cartTotal - discountAmount;
   const taxAmount = taxRate > 0 ? Math.round(taxableAmount * (taxRate / 100) * 100) / 100 : 0;
@@ -792,6 +803,9 @@ export default function Checkout() {
           ) : (
             <span>{formatCurrency(shippingFee, currency)}</span>
           )}
+        </div>
+        <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: '1rem' }}>
+          Shipping zone: <strong>{shippingZoneMessage}</strong>
         </div>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)', fontWeight: 600, fontSize: '1.25rem' }}>

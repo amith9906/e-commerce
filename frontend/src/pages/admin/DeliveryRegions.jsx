@@ -14,7 +14,7 @@ const initialRegionForm = {
   isActive: true
 };
 
-const initialLocationInput = { country: '', state: '', city: '', postalCode: '' };
+const initialLocationInput = { country: '', state: '', city: '', postalCodesText: '' };
 
 export default function DeliveryRegions() {
   const [regions, setRegions] = useState([]);
@@ -100,6 +100,23 @@ export default function DeliveryRegions() {
   }, []);
 
   const selectedRegion = useMemo(() => regions.find((region) => region.id === selectedRegionId), [regions, selectedRegionId]);
+  useEffect(() => {
+    if (selectedRegion) {
+      setRegionForm({
+        name: selectedRegion.name || '',
+        slug: selectedRegion.slug || '',
+        leadTimeDays: selectedRegion.leadTimeDays != null ? String(selectedRegion.leadTimeDays) : '',
+        notes: selectedRegion.notes || '',
+        taxRate: selectedRegion.taxRate != null ? String(Number(selectedRegion.taxRate)) : '',
+        taxLabel: selectedRegion.taxLabel || '',
+        isActive: selectedRegion.isActive ?? true
+      });
+      setRegionLocations(Array.isArray(selectedRegion.locations) ? selectedRegion.locations : []);
+    } else {
+      setRegionForm(initialRegionForm);
+      setRegionLocations([]);
+    }
+  }, [selectedRegion]);
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
     setPage(1);
@@ -109,10 +126,37 @@ export default function DeliveryRegions() {
     setPage(1);
   };
 
+  const parsePostalCodes = (value = '') => {
+    return value
+      .split(/[,\\n]+/)
+      .map((code) => code.trim())
+      .filter(Boolean);
+  };
+
   const handleAddLocation = () => {
-    if (!locationInput.country && !locationInput.state && !locationInput.city && !locationInput.postalCode) return;
-    setRegionLocations((prev) => [...prev, locationInput]);
+    const hasLocationFields = locationInput.country || locationInput.state || locationInput.city || locationInput.postalCodesText;
+    if (!hasLocationFields) return;
+    setRegionLocations((prev) => [
+      ...prev,
+      {
+        country: locationInput.country,
+        state: locationInput.state,
+        city: locationInput.city,
+        postalCodes: parsePostalCodes(locationInput.postalCodesText)
+      }
+    ]);
     setLocationInput(initialLocationInput);
+  };
+
+  const buildPendingLocation = () => {
+    const hasFields = locationInput.country || locationInput.state || locationInput.city || locationInput.postalCodesText;
+    if (!hasFields) return null;
+    return {
+      country: locationInput.country,
+      state: locationInput.state,
+      city: locationInput.city,
+      postalCodes: parsePostalCodes(locationInput.postalCodesText)
+    };
   };
 
   const handleRegionSubmit = async (event) => {
@@ -121,19 +165,26 @@ export default function DeliveryRegions() {
       return toast.error('Region name is required.');
     }
     const parsedTaxRate = regionForm.taxRate === '' ? undefined : Number(regionForm.taxRate);
+    const pending = buildPendingLocation();
     const payload = {
       ...regionForm,
       leadTimeDays: regionForm.leadTimeDays ? Number(regionForm.leadTimeDays) : null,
-      locations: regionLocations,
+      locations: pending ? [...regionLocations, pending] : regionLocations,
       taxRate: parsedTaxRate,
       taxLabel: regionForm.taxLabel?.trim() || ''
     };
     try {
       setSavingRegion(true);
-      await api.post('/delivery', payload);
-      toast.success('Delivery region saved.');
+      if (selectedRegionId) {
+        await api.put(`/delivery/${selectedRegionId}`, payload);
+        toast.success('Delivery region updated.');
+      } else {
+        await api.post('/delivery', payload);
+        toast.success('Delivery region saved.');
+      }
       setRegionForm(initialRegionForm);
       setRegionLocations([]);
+      setSelectedRegionId('');
       fetchRegions();
     } catch (err) {
       toast.error(err.message || 'Unable to save region.');
@@ -248,7 +299,10 @@ export default function DeliveryRegions() {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
                     {(region.locations || []).map((loc, idx) => (
                       <span key={`${region.id}-${idx}`} style={{ padding: '0.2rem 0.65rem', background: '#f8fafc', borderRadius: '999px', fontSize: '0.75rem' }}>
-                        {loc.country}{loc.state ? ` · ${loc.state}` : ''}{loc.city ? ` · ${loc.city}` : ''}{loc.postalCode ? ` · ${loc.postalCode}` : ''}
+                        {loc.country}{loc.state ? ` · ${loc.state}` : ''}{loc.city ? ` · ${loc.city}` : ''}
+                        {loc.postalCodes?.length
+                          ? ` · ${loc.postalCodes.join(', ')}`
+                          : loc.postalCode ? ` · ${loc.postalCode}` : ''}
                       </span>
                     ))}
                   </div>
@@ -342,11 +396,12 @@ export default function DeliveryRegions() {
                   className="input-field"
                   placeholder="City"
                 />
-                <input
-                  value={locationInput.postalCode}
-                  onChange={(e) => setLocationInput((prev) => ({ ...prev, postalCode: e.target.value }))}
+                <textarea
+                  value={locationInput.postalCodesText}
+                  onChange={(e) => setLocationInput((prev) => ({ ...prev, postalCodesText: e.target.value }))}
                   className="input-field"
-                  placeholder="Postal Code"
+                  placeholder="Postal Codes (comma or newline separated)"
+                  style={{ minHeight: '3rem', resize: 'vertical' }}
                 />
               </div>
               <button type="button" onClick={handleAddLocation} className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -354,12 +409,14 @@ export default function DeliveryRegions() {
               </button>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
                 {regionLocations.map((loc, idx) => (
-                  <span key={`${loc.country}-${idx}`} style={{ padding: '0.2rem 0.6rem', borderRadius: '999px', background: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem' }}>
+                <span key={`${loc.country}-${idx}`} style={{ padding: '0.2rem 0.6rem', borderRadius: '999px', background: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.8rem' }}>
                     {loc.country || 'Any country'}
-                    {(loc.state || loc.city || loc.postalCode) && <span>·</span>}
+                    {(loc.state || loc.city || (loc.postalCodes && loc.postalCodes.length > 0)) && <span>·</span>}
                     {loc.state && <span>{loc.state}</span>}
                     {loc.city && <span>{loc.city}</span>}
-                    {loc.postalCode && <span>{loc.postalCode}</span>}
+                    {loc.postalCodes && loc.postalCodes.length > 0 && (
+                      <span>{loc.postalCodes.join(', ')}</span>
+                    )}
                     <button type="button" onClick={() => removeLocation(idx)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>
                       <X size={12} />
                     </button>

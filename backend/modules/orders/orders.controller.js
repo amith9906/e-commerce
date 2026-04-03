@@ -8,6 +8,7 @@ const dayjs = require('dayjs');
 const { renderInvoiceContent, defaultTemplate, buildInvoiceContext, formatCurrencyWithTenant, createInvoiceNumber } = require('../../utils/invoiceTemplate');
 const { createInvoicePdfBuffer } = require('../../utils/pdfGenerator');
 const { buildRestrictionMap, getRestrictionForProduct, findRegionForAddress } = require('../../utils/deliveryHelper');
+const { determineShippingZone, calculateShippingFee } = require('../../utils/shippingHelper');
 const { emitNotificationEvent } = require('../../utils/notificationEmitter');
 const { calculateBalance, recordEntry } = require('../../utils/loyalty');
 const { resolveTaxConfig } = require('../../utils/tax');
@@ -176,15 +177,26 @@ const gatherPostalCodes = (regions = []) => {
   regions.forEach((region) => {
     const locations = Array.isArray(region.locations) ? region.locations : [];
     locations.forEach((location) => {
-      if (Array.isArray(location.postalCodes) && location.postalCodes.length) {
-        location.postalCodes.forEach((code) => postalSet.add(code));
+      const locationCodes = (location.postalCodes || []).slice();
+      if (location.postalCode) locationCodes.push(location.postalCode);
+      if (locationCodes.length) {
+        locationCodes.forEach((code) => postalSet.add(code));
       }
     });
   });
   return Array.from(postalSet).slice(0, 12);
 };
 
-const buildPostalCoverageMessage = (address, regions) => {
+const buildPostalCoverageMessage = (address, regions, validationMode = 'postal') => {
+  if (validationMode === 'country') {
+    return 'Delivery coverage is configured nationwide. Please verify your address or reach out to support if you still see this message.';
+  }
+  if (validationMode === 'state') {
+    return 'Delivery coverage is configured state-wise. Please use an address within one of the supported states or contact support for help.';
+  }
+  if (validationMode === 'city') {
+    return 'Delivery coverage is configured city-wise. Please use an address within a supported city or contact support for help.';
+  }
   const requiresPostal = regions.some((region) => {
     const locations = Array.isArray(region.locations) ? region.locations : [];
     return locations.some((location) => Array.isArray(location.postalCodes) && location.postalCodes.length);
@@ -254,16 +266,20 @@ const createOrder = async (req, res, next) => {
       where: { tenantId: req.tenant.id, isActive: true },
       order: [['lead_time_days', 'ASC']]
     });
-    const requiresPostal = regions.some((region) => {
+    const pinValidationMode = req.tenant?.settings?.shipping?.pinValidationMode || 'postal';
+    const requiresPostal = pinValidationMode === 'postal' && regions.some((region) => {
       const locations = Array.isArray(region.locations) ? region.locations : [];
       return locations.some((location) => Array.isArray(location.postalCodes) && location.postalCodes.length);
     });
     if (requiresPostal && !address.postalCode) {
       return res.status(400).json({ success: false, message: 'Postal code is required to confirm delivery coverage.' });
     }
-    const matchedRegion = findRegionForAddress(address, regions);
+    console.log('address', address);
+    console.log('regions', regions);
+    console.log('pinValidationMode', pinValidationMode);
+    const matchedRegion = findRegionForAddress(address, regions, pinValidationMode);
     if (!matchedRegion) {
-      return res.status(400).json({ success: false, message: buildPostalCoverageMessage(address, regions) });
+      return res.status(400).json({ success: false, message: buildPostalCoverageMessage(address, regions, pinValidationMode) });
     }
 
     await sequelize.transaction(async (t) => {
@@ -430,8 +446,11 @@ const createOrder = async (req, res, next) => {
         await coupon.increment('usageCount', { transaction: t });
       }
 
-      // 3. Calculate Shipping Fee ($50 flat, free if subtotal > 2000)
-      const shippingFee = subtotal > 2000 ? 0 : 50;
+      // 3. Calculate Shipping Fee (configurable threshold and flat fee)
+      const shippingSettings = req.tenant?.settings?.shipping || {};
+      const addressSnapshot = address.toJSON ? address.toJSON() : address;
+      const shippingZone = determineShippingZone({ origin: shippingSettings.origin || {}, address: addressSnapshot });
+      const shippingFee = calculateShippingFee({ shippingSettings, address: addressSnapshot, cartTotal: subtotal });
       const { rate: taxRate, label: taxLabel } = resolveTaxConfig({ tenant: req.tenant, region: matchedRegion });
       const netAmount = Math.max(subtotal - discountAmount, 0);
       const taxAmount = taxRate > 0 ? (netAmount * taxRate) / 100 : 0;

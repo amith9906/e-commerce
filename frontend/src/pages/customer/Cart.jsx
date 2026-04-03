@@ -6,7 +6,11 @@ import { formatCurrency } from '../../utils/formatCurrency';
 
 export default function Cart() {
   const { cartItems, removeFromCart, updateQuantity, cartTotal, clearCart, addToWishlist } = useCart();
-  const { currency = 'INR' } = useBrand();
+  const { currency = 'INR', settings: brandSettings = {} } = useBrand();
+  const shippingConfig = brandSettings.shipping || {};
+  const freeShippingThreshold = Number(shippingConfig.freeShippingThreshold ?? 2000);
+  const flatShippingFee = Number(shippingConfig.flatShippingFee ?? 50);
+  const cartShippingFee = cartTotal > freeShippingThreshold ? 0 : flatShippingFee;
 
   const handleMoveToWishlist = (item) => {
     addToWishlist({
@@ -121,10 +125,19 @@ export default function Cart() {
                 <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{formatCurrency(cartTotal, currency)}</span>
             </div>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
                 <span>Estimated Shipping</span>
-                <span style={{ fontWeight: 600, color: '#10b981' }}>FREE</span>
+                <span style={{ fontWeight: 600, color: cartShippingFee === 0 ? '#10b981' : 'var(--text-main)' }}>
+                  {cartShippingFee === 0 ? 'FREE' : formatCurrency(cartShippingFee, currency)}
+                </span>
             </div>
+            <p style={{ fontSize: '0.75rem', marginTop: 0, marginBottom: '1rem', color: 'var(--text-muted)' }}>
+              {cartShippingFee === 0
+                ? (freeShippingThreshold > 0
+                  ? `Orders above ${formatCurrency(freeShippingThreshold, currency)} qualify for free shipping.`
+                  : 'Free shipping applies to all orders.')
+                : `Shipping fee of ${formatCurrency(flatShippingFee, currency)} applies to orders below ${formatCurrency(freeShippingThreshold, currency)}.`}
+            </p>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem', color: 'var(--text-muted)', fontSize: '1rem' }}>
                 <span>Tax</span>

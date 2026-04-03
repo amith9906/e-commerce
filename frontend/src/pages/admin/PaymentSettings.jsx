@@ -50,6 +50,18 @@ const defaultSettings = {
   companyWebsite: '',
   invoiceNotes: '',
   codEnabled: false,
+  shipping: {
+    freeShippingThreshold: 2000,
+    flatShippingFee: 50,
+    pinValidationMode: 'postal',
+    origin: { country: 'India', state: '', city: '' },
+    rates: {
+      sameCity: 20,
+      sameState: 40,
+      outOfState: 60,
+      international: 120
+    }
+  }
 };
 
 
@@ -59,6 +71,15 @@ export default function PaymentSettings() {
   const [settings, setSettings] = useState(defaultSettings);
   const [supportedCurrencies, setSupportedCurrencies] = useState(currencyCatalog);
   const updateSetting = (key, value) => setSettings((prev) => ({ ...prev, [key]: value }));
+  const updateShippingSetting = (field, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      shipping: {
+        ...(prev.shipping || {}),
+        [field]: value
+      }
+    }));
+  };
   const updateSupportContact = (field, value) => setSettings((prev) => ({
     ...prev,
     supportContacts: {
@@ -66,10 +87,44 @@ export default function PaymentSettings() {
       [field]: value
     }
   }));
+  const updateShippingOrigin = (field, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      shipping: {
+        ...(prev.shipping || {}),
+        origin: {
+          ...(prev.shipping?.origin || {}),
+          [field]: value
+        }
+      }
+    }));
+  };
+  const updateShippingRates = (field, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      shipping: {
+        ...(prev.shipping || {}),
+        rates: {
+          ...(prev.shipping?.rates || {}),
+          [field]: value
+        }
+      }
+    }));
+  };
   const activeCurrencyMetadata = supportedCurrencies.find((currency) => currency.code === settings.currency) || supportedCurrencies[0];
   const previewCurrencyValue = formatCurrency(1234.56, settings.currency, {
     locale: activeCurrencyMetadata?.locale
   });
+  const shippingSettings = settings.shipping || {};
+  const freeShippingThreshold = Number(shippingSettings.freeShippingThreshold ?? 0);
+  const flatShippingFee = Number(shippingSettings.flatShippingFee ?? 0);
+  const pinValidationMode = shippingSettings.pinValidationMode || 'postal';
+  const pinValidationOptions = [
+    { value: 'country', label: 'All India (no pin validation)' },
+    { value: 'state', label: 'State-level coverage (pins ignored when state matches)' },
+    { value: 'city', label: 'City-level coverage (pins ignored when city matches)' },
+    { value: 'postal', label: 'Per PIN validation (default strict behavior)' },
+  ];
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -290,6 +345,115 @@ export default function PaymentSettings() {
                 <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)' }}>%</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '2rem' }}>
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Shield size={20} color="#0f172a" /> Shipping Configuration
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+            <div>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>Cart total for free shipping</label>
+              <input
+                type="number"
+                className="input-field"
+                value={freeShippingThreshold}
+                min={0}
+                onChange={(e) => updateShippingSetting('freeShippingThreshold', Number(e.target.value || 0))}
+                placeholder="e.g. 2000"
+              />
+              <p style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Orders above this amount qualify for free shipping ({formatCurrency(freeShippingThreshold || 0, settings.currency)}).
+              </p>
+            </div>
+            <div>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>Shipping fee below threshold</label>
+              <input
+                type="number"
+                className="input-field"
+                value={flatShippingFee}
+                min={0}
+                onChange={(e) => updateShippingSetting('flatShippingFee', Number(e.target.value || 0))}
+                placeholder="e.g. 50"
+              />
+              <p style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Flat fee applied when cart total remains below your free-shipping amount.
+              </p>
+            </div>
+          </div>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Origin address</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>Country</label>
+                <input
+                  className="input-field"
+                  value={shippingSettings.origin?.country || ''}
+                  onChange={(e) => updateShippingOrigin('country', e.target.value)}
+                  placeholder="India"
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>State</label>
+                <input
+                  className="input-field"
+                  value={shippingSettings.origin?.state || ''}
+                  onChange={(e) => updateShippingOrigin('state', e.target.value)}
+                  placeholder="Karnataka"
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>City</label>
+                <input
+                  className="input-field"
+                  value={shippingSettings.origin?.city || ''}
+                  onChange={(e) => updateShippingOrigin('city', e.target.value)}
+                  placeholder="Bengaluru"
+                />
+              </div>
+            </div>
+          </div>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Shipping rates by zone</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+              {[
+                { label: 'Same city', field: 'sameCity', description: 'Within origin city' },
+                { label: 'Same state', field: 'sameState', description: 'Different city, same state' },
+                { label: 'Other states', field: 'outOfState', description: 'Different state in origin country' },
+                { label: 'International', field: 'international', description: 'Outside origin country' }
+              ].map((opt) => (
+                <div key={opt.field}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>{opt.label}</label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    min={0}
+                    value={shippingSettings.rates?.[opt.field] ?? ''}
+                    onChange={(e) => updateShippingRates(opt.field, Number(e.target.value || 0))}
+                    placeholder="0"
+                  />
+                  <p style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>{opt.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{ fontSize: '0.875rem', fontWeight: 600, display: 'block', marginBottom: '0.5rem' }}>Postal-code validation</label>
+            <select
+              className="input-field"
+              value={pinValidationMode}
+              onChange={(e) => updateShippingSetting('pinValidationMode', e.target.value)}
+            >
+              {pinValidationOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Choose how strictly we validate postal codes for shipping coverage.
+            </p>
           </div>
         </div>
 

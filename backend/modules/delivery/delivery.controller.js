@@ -175,8 +175,10 @@ const checkAvailability = async (req, res, next) => {
       where: { tenantId: req.tenant.id, isActive: true },
       order: [['lead_time_days', 'ASC']]
     });
-
-    const matchedRegion = findRegionForAddress(address, regions);
+    console.log('address', address);
+    console.log('regions', regions);
+    const pinValidationMode = req.tenant?.settings?.shipping?.pinValidationMode || 'postal';
+    const matchedRegion = findRegionForAddress(address, regions, pinValidationMode);
     const product = productId ? await Product.findOne({ where: { id: productId, tenantId: req.tenant.id } }) : null;
 
     let restrictionData = null;

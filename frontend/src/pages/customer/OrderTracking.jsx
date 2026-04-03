@@ -102,6 +102,16 @@ export default function OrderTracking() {
   const currentStepIdx = STATUS_ORDER.indexOf(order.status);
   const addr = order.shippingAddressSnapshot;
   const fmt = (n) => formatCurrency(Number(n || 0), currency);
+  const itemsSubtotal = order?.items?.reduce(
+    (sum, item) => sum + Number(item.unitPrice || 0) * Number(item.quantity || 0),
+    0
+  ) || 0;
+  const loyaltyMeta = order?.payment?.metadata?.loyalty || {};
+  const giftCardMeta = order?.payment?.metadata?.giftCard || {};
+  const pointsUsed = Number(loyaltyMeta.points || 0);
+  const pointsDeduction = Number(loyaltyMeta.deduction || 0);
+  const giftCardDeduction = Number(giftCardMeta.deduction || 0);
+  const amountPaidViaGateway = Number(order?.payment?.amount || 0);
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '1.5rem 1rem' }}>
@@ -263,15 +273,41 @@ export default function OrderTracking() {
 
         {/* Summary */}
         <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 6 }}>
+            <span>Subtotal</span>
+            <span>{fmt(itemsSubtotal)}</span>
+          </div>
           {order.discountAmount > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: '#10b981', marginBottom: 6 }}>
               <span>Discount</span>
-              <span style={{ color: '#10b981' }}>-{fmt(order.discountAmount)}</span>
+              <span>-{fmt(order.discountAmount)}</span>
+            </div>
+          )}
+          {order.taxAmount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 6 }}>
+              <span>{order.taxLabel || 'Tax'}</span>
+              <span>{fmt(order.taxAmount)}</span>
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 6 }}>
             <span>Shipping</span>
             <span>{Number(order.shippingFee) === 0 ? <span style={{ color: '#10b981' }}>Free</span> : fmt(order.shippingFee)}</span>
+          </div>
+          {pointsDeduction > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 6 }}>
+              <span>Loyalty points{pointsUsed > 0 ? ` (${pointsUsed} pts)` : ''}</span>
+              <span>-{fmt(pointsDeduction)}</span>
+            </div>
+          )}
+          {giftCardDeduction > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 6 }}>
+              <span>Gift card credit</span>
+              <span>-{fmt(giftCardDeduction)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: 6 }}>
+            <span>Amount paid ({order.payment?.paymentMethod || 'Payment'})</span>
+            <span>{fmt(amountPaidViaGateway)}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)', marginTop: 8 }}>
             <span>Total</span>

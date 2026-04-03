@@ -2,7 +2,24 @@
 
 const normalize = (value) => (value || '').toString().trim().toLowerCase();
 
-const matchesLocation = (address, location) => {
+const collectPostalCodes = (location) => {
+  if (!location) return [];
+  const codes = [];
+  if (Array.isArray(location.postalCodes)) {
+    codes.push(...location.postalCodes);
+  }
+  if (location.postalCode) {
+    codes.push(location.postalCode);
+  }
+  return codes
+    .map((code) => normalize(code))
+    .filter((code) => code);
+};
+
+const matchesLocation = (address, location, validationMode = 'postal') => {
+  console.log('matching address', normalize(address.city), normalize(address.state), normalize(address.country), normalize(address.postalCode));
+console.log('against location', normalize(location.city), normalize(location.state), normalize(location.country), collectPostalCodes(location));
+
   if (!location || !address) return false;
   if (location.country && normalize(location.country) !== normalize(address.country)) {
     return false;
@@ -16,18 +33,29 @@ const matchesLocation = (address, location) => {
     return false;
   }
 
-  if (location.postalCodes && Array.isArray(location.postalCodes) && location.postalCodes.length > 0) {
+  const postalCodes = collectPostalCodes(location);
+  if (validationMode === 'country' && location.country) {
+    return true;
+  }
+  if (validationMode === 'state' && location.state) {
+    return true;
+  }
+  if (validationMode === 'city' && location.city) {
+    return true;
+  }
+  if (postalCodes.length > 0) {
     if (!address.postalCode) return false;
     const postal = normalize(address.postalCode);
-    if (!location.postalCodes.some((code) => normalize(code) === postal)) {
+    if (!postalCodes.includes(postal)) {
       return false;
     }
+    return true;
   }
 
   return true;
 };
 
-const findRegionForAddress = (address, regions = []) => {
+const findRegionForAddress = (address, regions = [], validationMode = 'postal') => {
   if (!address || !regions.length) return null;
 
   return regions.find((region) => {
@@ -35,7 +63,8 @@ const findRegionForAddress = (address, regions = []) => {
     if (!locations.length) {
       return true;
     }
-    return locations.some((loc) => matchesLocation(address, loc));
+    console.log('locations', locations);
+    return locations.some((loc) => matchesLocation(address, loc, validationMode));
   }) || null;
 };
 
